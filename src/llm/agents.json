@@ -1,0 +1,117 @@
+{
+  "agents": [
+    {
+      "id": "OrchestratorAgent",
+      "purpose": "Top‐level coordinator: handles login, experiment load, and dispatches runtime tasks",
+      "calls": [
+        "ContextBuilderAgent",
+        "PromptAgent",
+        "ExecutionAgent",
+        "PostProcessorAgent"
+      ]
+    },
+    {
+      "id": "ContextBuilderAgent",
+      "purpose": "Assemble profile & experiment context (cache first, then fall back to retrievers)",
+      "tools": [
+        "CacheService",
+        "MetadataRetriever",
+        "OpenSearchRetriever",
+        "VectorStoreRetriever"
+      ],
+      "resources": [
+        "user_profile",
+        "experiment_metadata",
+        "time_series_data",
+        "session_memory"
+      ]
+    },
+    {
+      "id": "PromptAgent",
+      "purpose": "Build the dynamic, step-specific LLM-1 prompt from cached context and vector lookups",
+      "tools": [
+        "CacheService",
+        "VectorStoreRetriever",
+        "LLM1"
+      ],
+      "resources": [
+        "step_context",
+        "prompt_templates"
+      ]
+    },
+    {
+      "id": "ExecutionAgent",
+      "purpose": "Run the multi-action agent over LLM-2 + tools for analysis, retrieval, and output generation",
+      "tools": [
+        "MetadataRetriever",
+        "OpenSearchRetriever",
+        "VectorStoreRetriever",
+        "ResultGenerator",
+        "LLM2"
+      ],
+      "resources": [
+        "analysis_functions",
+        "chart_templates"
+      ]
+    },
+    {
+      "id": "PostProcessorAgent",
+      "purpose": "Normalize and package the ExecutionAgent’s raw output into API-ready payloads",
+      "tools": [
+        "ResultFormatter"
+      ],
+      "resources": [
+        "response_schema"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "MetadataRetriever",
+      "type": "REST",
+      "endpoint": "/experiments",
+      "description": "Fetch experiment & lab metadata from Postgres"
+    },
+    {
+      "id": "OpenSearchRetriever",
+      "type": "REST",
+      "endpoint": "/readings",
+      "description": "Query instrument time-series from AWS OpenSearch"
+    },
+    {
+      "id": "VectorStoreRetriever",
+      "type": "REST",
+      "endpoint": "/vector/query",
+      "description": "Exact-filter + semantic lookups in Pinecone/OpenSearch vectors"
+    },
+    {
+      "id": "ResultGenerator",
+      "type": "service",
+      "description": "Chart/graph rendering and URL generation"
+    },
+    {
+      "id": "ResultFormatter",
+      "type": "local",
+      "description": "Markdown/JSON post-processing utility"
+    }
+  ],
+  "services": [
+    {
+      "id": "CacheService",
+      "type": "redis",
+      "description": "Session & context caching"
+    },
+    {
+      "id": "LLM1",
+      "type": "llm",
+      "provider": "OpenAI/Azure",
+      "role": "Prompt Engineering"
+    },
+    {
+      "id": "LLM2",
+      "type": "llm",
+      "provider": "OpenAI/Azure",
+      "role": "Task Execution"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+    "llms": [
+        {
+            "provider": "OpenAI", 
+            "provider_id": "openai", 
+            "models": [
+                {
+                    "name": "GPT-4o mini",
+                    "model_id": "gpt-4o-mini",
+                    "version": "2025-06-18"
+                }, 
+                {
+                    "name": "GPT-41",
+                    "model_id": "gpt-4.1"
+                }
+            ]
+        }
+    ]
+}
