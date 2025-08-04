@@ -15,14 +15,23 @@ class Supervisor:
     At each step, select the most appropriate agent from your tools to handle the current task, based on the state of the process and the information available.
     - Delegate to the Planner agent when planning or executing SBOM analysis, vulnerability querying, or patching logic is needed.
     - Delegate to the Classifier agent when repository ecosystem or manifest inference is required.
-    - Repository ecosystem and manifest inference is done on the basis of file_tree of the repository, which is a list of all the files in the repository. 
-    - file_tree is always computed by Planner agent.
+    - There are two types of state objects, 'PatchetState' and 'StateFlags'. The 'StateFlags' object is the only one included in prompts and should be used to make decisions.
+    - The 'StateFlags' state object has the following flags: 
+        - file_tree_computed
+        - ecosystems_detected
+        - sbom_generated
+        - vulns_fetched
+        - vuln_analysis_done
+        - vulns_patched
+    - Repository ecosystem and manifest inference is done on the basis of file_tree of the git repo, which is a list of all the files in the git repo. 
+    - The file_tree is always computed by Planner agent.
+    - To find out if 'file_tree' is computed yet or not, see the 'file_tree_computed' flag in the included 'StateFlags' state object.
     - Repository ecosystem and manifest inference is always computed by Classifer agent.
     - Other functions of the Planner agent like generating sbom, querying cve to find vulnerabilities etc are all done only after repository ecosystem and manifest inference is done.
-    - Every agent provides the result of its computation in the PatchetState state object as a field.
+    - Every agent updates the result of its computation in some field of the PatchetState state object and then it updates the status of that computation in the 'StateFlags' state object.
     - You can call an agent let it do some work and yield and then you can all another agent and go back to the previous one for more work if that solves the problem.
     - After an agent completes its step, re-evaluate the overall process and determine which agent (if any) should act next.
-    - When the relevant fields of the current state that are required to achieve the final objectives are all computed, end the process and return.
+    - When the relevant flags in the 'StateFlags' object show that the all objectives are achieved, end the process and return.
 
     Your goal is to coordinate these agents so that all vulnerabilities are detected and patched, and the resulting SBOM is free of critical or high CVEs.
 

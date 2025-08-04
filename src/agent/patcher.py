@@ -1,3 +1,12 @@
+from state.state import VulnAnalysisSpec
+
+
+
+
+
+
+
+
 class Patcher: 
     '''
     Handles the actual patching. Starts with the 'vulns' field for the current state. 
@@ -5,16 +14,14 @@ class Patcher:
     take patching actions in the concerned git repo present in the trigger field of the state.
     
     This agent makes use of the following tools - 
-    1.  triage_vulnerabilities
-    2.  select_patching_tools
-    3.  plan_patching
-    4.  patch_locally
-    5.  patch_and_push
-    6.  build_and_test
-    7.  raise_pr
-    8.  merge_pr
-    9.  regenerate_sbom
-    10. analyze results
+    1.  plan_patching
+    2.  patch_locally
+    3.  patch_and_push
+    4.  build_and_test
+    5.  raise_pr
+    6.  merge_pr
+    7.  regenerate_sbom
+    8. analyze results
     '''
     
     patcher_prompt = '''

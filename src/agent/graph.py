@@ -5,8 +5,10 @@ from langgraph.graph import StateGraph, START, END
 from langsmith import traceable
 from typing import Callable, Literal
 from enum import Enum
-from state.state import PatchetState, serialize_state
-import json, uuid, asyncio, inspect
+from state.state import PatchetState, serialize_state, serialize_state_flags
+import json, uuid, asyncio, inspect, tiktoken
+from tiktoken import Encoding
+from state.state import CURRENT_STATE
 
 class InternalTools: 
     '''
@@ -42,12 +44,10 @@ class ReActAgent:
         
     def __init__(self, prompt: str = "<Tools>{tools_prompt}</Tools> \n<Input>{input}</Input>", tools: list[Tool] = [], 
                  llm_name: str = "openai:gpt-4.1", conditionally_continue: Callable[[PatchetState], bool]  = None, 
-                 limit: int = -1):
+                 limit: int = -1, state_overrides: dict = {}, field_exclusion_func: Callable[[PatchetState], list[str]] = None, 
+                 state_serializer_func: Callable[[PatchetState, list[str]], str] = serialize_state):
         self.prompt = f"""
-            {prompt if prompt else ""}\n\n
-            <GlobalState/>\n{{current_state}}\n<GlobalState>\n\n
-            {{tools_prompt}} \n\n
-            <Input>\n{{user_input}}\n</Input>\n
+            {prompt if prompt else ""}\n\n<CurrentState>\n{{current_state}}\n</CurrentState>\n\n<StateFlags>\n{{state_flags}}\n</StateFlags>\n\n{{tools_prompt}} \n\n<Input>\n{{user_input}}\n</Input>\n
         """
         self.tools = tools.extend([StructuredTool.from_function(InternalTools.Yield), StructuredTool.from_function(InternalTools.Done)])
         
@@ -60,7 +60,10 @@ class ReActAgent:
             self.tools_prompt = "".join(
                 [f"{index + 1}. {tool.name}({tool.args_schema}) - {tool.description}\n" for index, tool in enumerate(tools)]
             )
-        self.agent = None            
+        self.agent = None
+        self.state_overrides = state_overrides
+        self.field_exclusion_func = field_exclusion_func
+        self.state_serializer_func = state_serializer_func
     
     @traceable
     async def consult_llm(self, state:  PatchetState) -> PatchetState: 
@@ -79,7 +82,8 @@ class ReActAgent:
         llm_advice = await self.tool_aware_llm.ainvoke(
             [
                 {"role": "system", "content": self.prompt.format(
-                    current_state=serialize_state(state, exclusions=["messages", "input"]),
+                    current_state=self.state_serializer_func(state, exclusions=self.field_exclusion_func(state) if self.field_exclusion_func else state.default_exclusion_list()),
+                    state_flags=serialize_state_flags(state),
                     tools_prompt=f"<Tools>\n{self.tools_prompt}\n</Tools>" if self.tools_prompt else "",
                     user_input=state.input
                 )}
@@ -105,13 +109,20 @@ class ReActAgent:
                     tool = self.tools_by_name[tool_call["name"]]
                     args = tool_call["args"]
                     if isinstance(args, str): 
-                        args = json.loads(args)            
-                    parent_messages = state.messages.copy() if inspect.ismethod(tool.func) and isinstance(tool.func.__self__, ReActAgent) else None
-                    observation = await tool.ainvoke(args)
+                        args = json.loads(args)
+                    is_tool_an_agent: bool = inspect.ismethod(tool.func) and isinstance(tool.func.__self__, ReActAgent)            
+                    parent_messages = state.messages.copy() if is_tool_an_agent else None
+                    args = {'state': state.model_dump(exclude=set(['messages']))} if is_tool_an_agent else args
+                    token = CURRENT_STATE.set(state)
+                    try:
+                        observation = await tool.ainvoke(args)
+                    finally: 
+                        CURRENT_STATE.reset(token)
                     if asyncio.iscoroutine(observation) or asyncio.iscoroutinefunction(observation): 
                         observation = await observation
                     self.transfer_to_state(observation, state, parent_messages)
-                    state.messages.append({"role": "tool", "content": f"{observation}", "tool_call_id": tool_call["id"]})        
+                    tool_call_id = tool_call["id"]
+                    state.messages.append({"role": "tool", "content": f"{self.safe_content(observation, tool_call_id)}", "tool_call_id": tool_call_id})        
         return state
     
     @traceable
@@ -149,6 +160,9 @@ class ReActAgent:
         Winds up the agent processing before returning to the caller and right after a Yield / Done tool call.
         '''
         state.messages = []
+        if self.state_overrides and isinstance(self.state_overrides, dict): 
+            for field, value in self.state_overrides.items(): 
+                setattr(state, field, value)
         return state
     
     @traceable
@@ -178,6 +192,30 @@ class ReActAgent:
         
         return self
     
+    def safe_content(self, observation: any, tool_call_id: str, max_tokens: int = 500) -> str: 
+        '''
+        Check on the length of the observation before appending it to messages for next potential LLM call.
+        '''
+        if not observation: 
+            return ''
+        
+        encoding: Encoding = None
+        
+        try:
+            encoding = tiktoken.get_encoding('cl100k_base')
+        except: 
+            encoding = tiktoken.get_encoding('o200k_base')
+        
+        obs = str(observation)
+        
+        if not encoding: 
+            return obs
+        
+        tokens = encoding.encode(obs)
+        if len(tokens) > max_tokens: 
+            return f"<{tool_call_id}> output is too long. Please extract it from the GlobalState."
+        return obs
+
     @traceable
     def transfer_to_state(self, observation: any, state: PatchetState, parent_messages: list): 
         '''

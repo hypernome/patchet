@@ -1,68 +1,42 @@
-from state.state import Repo
+from state.state import Repo, Ecosystem, VulnAnalysisSpec, SbomTarget
 from model.types import SBOMQuery
 from langchain.tools import StructuredTool
 from langsmith import traceable
 from agent.graph import ReActAgent
+from endpoints.github import list_files as lf
+from endpoints.sbom import generate_sbom_and_vulns
 
 @traceable
 def list_files(repo: Repo) -> list[str]: 
-    '''ss
+    '''
     Fetch the file tree from git repo and create a list of all files in the repo.
     '''
+    repo_files = lf(repo)
+    return {"file_tree": repo_files["repo_files"] if repo_files else []}
+
+@traceable
+async def generate_sbom_with_vulns(repo: Repo, ecosystems: list[Ecosystem]) -> dict: 
+    '''
+    Takes the repo and all the globs representing a manifest file in git repo and generates 
+    a consolidated SBOM at the repo level. Also responsible for saving this SBOM and setting 
+    the necessary state to indicate the SBOM generation result. Overall this tool is responsible 
+    for the following tasks - 
+    1. Use the provided repo and ecosystem to generate an SBOM.
+    2. Save the SBOM and generate a reference.
+    3. Update the indicator field 'sbom_generated' to True if the SBOM was generated successfully and to False if it failed.
+    4. Obtain the reference to the saved SBOM and update the field 'sbom_ref' with that reference.
+    5. Extract package urls ('purl') from each of the component library packages from SBOM. 
+    6. Use these extracted purls to query osv.dev database and find vulnerabilities for each of them.
+    7. Generate a list of mappings between purl and its vulnerabilities and populate the 'vulns' field of the state with it.    
+    '''
+    target: SbomTarget = SbomTarget.create(repo, ecosystems, start=500, stop=1499)
+    vulns = await generate_sbom_and_vulns(target, is_mocked=True)
+    
     return {
-        "file_tree": [
-            "README.md",
-            "pom.xml",
-            "src/main/java/com/example/App.java",
-            "src/main/resources/application.properties"
-        ]
+        "sbom_generated": True,
+        "sbom_ref": "./endpoints/fixtures/sbom.json",
+        "vulns": vulns
     }
-
-@traceable
-def generate_sbom_from_manifests(globs: list[str]) -> dict: 
-    '''
-    Takes all the globs representing a manifest file in git repo and generates 
-    a consolidated SBOM at the repo level.
-    '''
-    sbom = {
-        "dependencies": [
-            {
-                "name": "org.springframework:spring-core",
-                "version": "5.2.0.RELEASE",
-                "purl": "pkg:maven/org.springframework/spring-core@5.2.0.RELEASE"
-            },
-            {
-                "name": "org.slf4j:slf4j-api",
-                "version": "1.7.30",
-                "purl": "pkg:maven/org.slf4j/slf4j-api@1.7.30"
-            }
-        ]
-    }
-    return {"sbom": sbom}
-
-@traceable
-def query_cve(sbom: dict) -> dict[str, dict]: 
-    """
-    Given the current sbom (software bill of materials), call this tool to fetch vulnerabilities for each purl.
-    Required argument:
-        sbom: The **FULL** current sbom dictionary as stored in the global state or historical tool message. 
-        Always provide the latest value.
-    """
-    vulns = {
-        "pkg:maven/org.springframework/spring-core@5.2.0.RELEASE": {
-            "cve_id": "CVE-2020-5421",
-            "description": "Spring Core vulnerability allowing remote code execution.",
-            "severity": "CRITICAL",
-            "patched_versions": ["5.2.9.RELEASE", "5.3.0.RELEASE"]
-        },
-        "pkg:maven/org.slf4j/slf4j-api@1.7.30": {
-            "cve_id": None,  # No known CVE for this version
-            "description": None,
-            "severity": None,
-            "patched_versions": []
-        }
-    }
-    return {"vulns": vulns}
 
 @traceable
 def search_sbom_index(sbom_query: SBOMQuery) -> dict: 
@@ -81,21 +55,49 @@ def search_sbom_index(sbom_query: SBOMQuery) -> dict:
         }
     }
 
+def triage_vulns(file_list: list[str], sbom: dict, vulns: list[str]) -> VulnAnalysisSpec:
+    '''
+    This tool is used to triage vulnerabilities present in the provided list of vulnerabilities. For 
+    each of these vulnerabilities it produces an analysis spec that sums up the details about the 
+    following: 
+    1. Vulnerability CVE id.
+    2. Severity
+    3. Applicable manifest file path with applicable ecosystem. 
+    4. Applicable lock file.
+    '''
+
 class Planner: 
     '''
-    Handles SBOM planning and patching (tools: list_files, generate_sbom, etc)
+    Handles planning for patching (tools: list_files, generate_sbom, etc). This agent uses the following tools: 
+    - list_files
+    - generate_sbom_with_vulns
+    - search_sbom_index
+    - triage_vulns
     '''
     
     planner_prompt = '''
     You are the Planner agent for an automated SBOM patching system.
 
     At each step, choose the most appropriate tool to advance the process toward generating a vulnerability-free SBOM for the target repository.
-    - Use file listing tools to enumerate repository files. This tool should be used only if the current state does not already have value for file_tree.
+    - Use file listing tools to enumerate repository files. This tool should be used only if the flags, 'file_tree_computed' and 'ecosystems_detected' in the 'StateFlags' state object are currently False.
+    - There are two types of state objects, 'PatchetState' and 'StateFlags'. The 'StateFlags' object is the only one included in prompts and should be used to make decisions.
+    - The 'StateFlags' state object has the following flags: 
+        - file_tree_computed
+        - ecosystems_detected
+        - sbom_generated
+        - vulns_fetched
+        - vuln_analysis_done
+        - vulns_patched
+    - In case the 'file_tree_computed' flag False but 'ecosystems_detected' flag is True, assume that file listing is not required anymore for the next steps. The only function of 'file_tree' was to provide input to compute 'ecosystems' field.
     - You do not have the ability to compute manifests, therefore Yield if there are no manifests available after listing tool has enumerated repository files, so that other agents can compute manifest and return control back to you.
-    - If both file_tree and ecosystems values are available in the current state, and other values like 'sbom', 'vulns' etc are not available then proceed with relevant tools.
-    - Generate SBOMs using identified manifests, if available. Whether manifests are available or not can be found out by looking at the 'ecosystems' in the current state.
-    - Generated SBOM is availble in the 'sbom' value in the current state.
-    - Use generated SBOM to find vulnerabilities via the query_cve tool to identify CVEs affecting dependencies.
+    - If both file_tree and ecosystems have been computed already, and other values like 'sbom_ref', 'vulns' etc are not available then proceed with relevant tools.
+    - Generate SBOMs using identified manifests, if available. Whether manifests are available or not can be found out by looking at the 'ecosystems_detected' flag in the 'StateFlags' state object.
+    - Resolve vulnerabilities for all the packages included in the generated SBOM
+    - SBOM generation along with vulnerability resolution can be done by using a single tool 'generate_sbom_with_vulns'.
+    - Successful SBOM generation is indicated by the True value in the 'sbom_generated' flag. 
+    - Similarly, successful vulnerability resolution is indicated by the presense of non-empty vulns list in the 'vulns' field.
+    - If 'sbom_generated' field is True and the 'vulns' field is still empty, it means that no vulnerabilities were found and the current SBOM is the final one.
+    - The 'sbom_ref' field contains path to the generated SBOM. This path could be a file system path, a url or an arbitrary reference. This 'sbom_ref' field needs to be interpreted only in context of the 'sbom_generated' field.
     - If additional information (e.g., repository ecosystem) is required, or you cannot proceed further, call the `Yield` tool to return control to the Supervisor agent.
     - If the current state has sufficient data to indicate that the objective is over, then call the Done tool.
     - Definition of Done: When file_tree, ecosystems, sbom and vulns all have values in the current state, the objective has been achieved.
@@ -111,8 +113,7 @@ class Planner:
         self.name = "Planner"
         self.planner_tools = [
             StructuredTool.from_function(list_files), 
-            StructuredTool.from_function(generate_sbom_from_manifests), 
-            StructuredTool.from_function(query_cve), 
+            StructuredTool.from_function(generate_sbom_with_vulns), 
             StructuredTool.from_function(search_sbom_index)
         ]
         self.agent_graph = ReActAgent(self.planner_prompt, self.planner_tools, limit=10)
