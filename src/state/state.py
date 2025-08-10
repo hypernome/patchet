@@ -2,7 +2,20 @@ from pydantic import BaseModel
 from typing import Literal
 from contextvars import ContextVar
 from util.constants import Constants
+from enum import Enum
 import yaml
+
+class Severity(Enum): 
+    '''
+    Enum representing different severity values for vulnerabilities.
+    '''
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    NONE = "NONE"
+    UNKNOWN = "UNKNOWN"
+    
 
 class Repo(BaseModel): 
     '''
@@ -80,14 +93,26 @@ class VulnAnalysisSpec(BaseModel):
     Represents the result of vulnerablity analysis done on list of vulnerbilities
     found under scope.
     '''
-    cve_id: str
-    severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-    manifest: str   # e.g.: path/to/pom.xml or package.json
-    lockfile: str   # e.g. path/to/generated/effective/pom.xml or package-lock.json
-    ecosystem: Ecosystem # e.g. Maven, Npm etc.
-    direct_dep: str
-    fixed_in: str
+    id: str
+    cve_id: str | None = None
+    severity: Severity
+    manifest: str | None = None  # e.g.: path/to/pom.xml or package.json
+    lockfile: str | None = None  # e.g. path/to/generated/effective/pom.xml or package-lock.json
+    ecosystem: Ecosystem | None = None # e.g. Maven, Npm etc.
+    package: str
+    fixed_in: str | None = None
     is_transitive: bool
+
+class PackageUpgrade(BaseModel): 
+    '''
+    Represents a package upgrade to be used as input into the patching process.
+    '''
+    ecosystem: str
+    manifest: str
+    package: str
+    severity: Severity
+    target_version: str
+    cve_ids: list[str]
 
 class SbomTarget(BaseModel): 
     '''
@@ -108,6 +133,35 @@ class SbomTarget(BaseModel):
         sbom_target.stop = stop
         return sbom_target
 
+class VulnAnalysisRequest(BaseModel): 
+    '''
+    Represents a request for vulnerability analysis.
+    '''
+    ecosystems: list[Ecosystem] = []
+    vulns: list[dict] = []
+
+class PatchingAction(BaseModel): 
+    '''
+    Represents a step in the patching process.
+    '''
+    action: Literal["upgrade", "revert"]
+    package: str
+    to_version: str    
+    
+class PatchingBatch(BaseModel): 
+    '''
+    Represents a batch of patch steps in the patching process.
+    '''
+    name: str
+    target_manifest: str
+    actions: list[PatchingAction]    
+
+class PatchPlan(BaseModel): 
+    '''
+    Represents the patch plan for performing final patching.
+    '''
+    batches: list[PatchingBatch]
+
 class PatchetState(BaseModel): 
     '''
     Overall global state available to all the agents. To be used to pass application wide messages.
@@ -120,11 +174,12 @@ class PatchetState(BaseModel):
     ecosystems: list[Ecosystem] = []    
     sbom_ref: str | None = None
     vulns: list[dict] = []
-    vuln_analysis: VulnAnalysisSpec | None = None
+    vuln_analysis: list[PackageUpgrade] | None = None
+    patch_plan: PatchPlan | None = None
     results: dict[str, dict] = {}
     
     def default_exclusion_list(self): 
-        return ["messages", "input", "file_tree"]
+        return ["messages", "input", "file_tree", "vulns", "vuln_analysis", "patch_plan"]
 
 class StateFlags(BaseModel): 
     '''
@@ -135,6 +190,7 @@ class StateFlags(BaseModel):
     sbom_generated: bool = False
     vulns_fetched: bool = False
     vuln_analysis_done: bool = False
+    patch_planned: bool = False
     vulns_patched: bool = False
     
     @staticmethod
@@ -145,6 +201,7 @@ class StateFlags(BaseModel):
         state_flags.sbom_generated = True if state.sbom_ref else False
         state_flags.vulns_fetched = True if state.vulns else False
         state_flags.vuln_analysis_done = True if state.vuln_analysis else False
+        state_flags.patch_planned = True if state.patch_plan else False
         state_flags.vulns_patched = True if state.results else False        
         return state_flags
     

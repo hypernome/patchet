@@ -51,8 +51,6 @@ class ReActAgent:
         """
         self.tools = tools.extend([StructuredTool.from_function(InternalTools.Yield), StructuredTool.from_function(InternalTools.Done)])
         
-        init_chat_model(llm_name, temperature=0.0).with_structured_output(PatchetState)
-        
         self.tool_aware_llm = init_chat_model(llm_name, temperature=0.0).bind_tools(tools)        
         self.conditionally_continue = conditionally_continue
         if tools: 
@@ -116,13 +114,14 @@ class ReActAgent:
                     token = CURRENT_STATE.set(state)
                     try:
                         observation = await tool.ainvoke(args)
+                        if asyncio.iscoroutine(observation) or asyncio.iscoroutinefunction(observation): 
+                            observation = await observation
+                        self.transfer_to_state(observation, state, parent_messages)
+                        tool_call_id = tool_call["id"]
+                        state.messages.append({"role": "tool", "content": f"{self.safe_content(observation, tool_call_id)}", "tool_call_id": tool_call_id})        
                     finally: 
                         CURRENT_STATE.reset(token)
-                    if asyncio.iscoroutine(observation) or asyncio.iscoroutinefunction(observation): 
-                        observation = await observation
-                    self.transfer_to_state(observation, state, parent_messages)
-                    tool_call_id = tool_call["id"]
-                    state.messages.append({"role": "tool", "content": f"{self.safe_content(observation, tool_call_id)}", "tool_call_id": tool_call_id})        
+                    
         return state
     
     @traceable
@@ -244,6 +243,26 @@ class ReActAgent:
         '''
         if self.agent: 
           return self.agent.invoke(state)
-    
+
+
+class StrcturedAgent: 
+    '''
+    Basic Structured agent implementation.
+    '''
         
- 
+    def __init__(self, structure_on, prompt: str = "<Input>{input}</Input>",  
+                 llm_name: str = "openai:gpt-4.1"):
+        self.prompt = f"""
+            {prompt if prompt else ""}\n\n<Input>\n{{input}}\n</Input>\n
+        """
+        self.structured_llm = init_chat_model(llm_name, temperature=0.0).with_structured_output(structure_on)
+        
+    async def structure_single_output(self, input: str): 
+        structured_output = await self.structured_llm.ainvoke(
+            [
+                {"role": "system", "content": self.prompt.format(
+                    input=input                    
+                )}
+            ] 
+        )
+        return structured_output

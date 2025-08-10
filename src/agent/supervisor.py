@@ -9,40 +9,58 @@ class Supervisor:
     Main supervisor graph that coordinates agentic decisions and routing.
     '''
     
-    supervisor_prompt = '''
-    You are the Supervisor agent responsible for orchestrating the SBOM patching workflow across multiple specialized agents.
+    supervisor_prompt = """
+    You are the **Supervisor** agent that coordinates two tools:
 
-    At each step, select the most appropriate agent from your tools to handle the current task, based on the state of the process and the information available.
-    - Delegate to the Planner agent when planning or executing SBOM analysis, vulnerability querying, or patching logic is needed.
-    - Delegate to the Classifier agent when repository ecosystem or manifest inference is required.
-    - There are two types of state objects, 'PatchetState' and 'StateFlags'. The 'StateFlags' object is the only one included in prompts and should be used to make decisions.
-    - The 'StateFlags' state object has the following flags: 
-        - file_tree_computed
-        - ecosystems_detected
-        - sbom_generated
-        - vulns_fetched
-        - vuln_analysis_done
-        - vulns_patched
-    - Repository ecosystem and manifest inference is done on the basis of file_tree of the git repo, which is a list of all the files in the git repo. 
-    - The file_tree is always computed by Planner agent.
-    - To find out if 'file_tree' is computed yet or not, see the 'file_tree_computed' flag in the included 'StateFlags' state object.
-    - Repository ecosystem and manifest inference is always computed by Classifer agent.
-    - Other functions of the Planner agent like generating sbom, querying cve to find vulnerabilities etc are all done only after repository ecosystem and manifest inference is done.
-    - Every agent updates the result of its computation in some field of the PatchetState state object and then it updates the status of that computation in the 'StateFlags' state object.
-    - You can call an agent let it do some work and yield and then you can all another agent and go back to the previous one for more work if that solves the problem.
-    - After an agent completes its step, re-evaluate the overall process and determine which agent (if any) should act next.
-    - When the relevant flags in the 'StateFlags' object show that the all objectives are achieved, end the process and return.
+    • **Planner**   - computes file-tree, SBOM, vuln list, analysis, patches  
+    • **Classifier** - detects repository ecosystems / manifest paths
 
-    Your goal is to coordinate these agents so that all vulnerabilities are detected and patched, and the resulting SBOM is free of critical or high CVEs.
+    ───────────────────  STATE  ───────────────────
+    You see **only** the compact `StateFlags` object (booleans):
 
-    You can only call one agent/tool at a time before waiting for the next cycle. You can call any agent any number of times at different times, even if they 
-    have executed before and returned, this is because some agents can potentially perform partial work and return to you so you get work done by other agents 
-    before the state has enough information for the previous agent to do more work. If the process is complete, call the `Done` tool.
+    file_tree_computed
+    ecosystems_detected
+    sbom_generated
+    vulns_fetched
+    vuln_analysis_done 
+    patch_planned # (final flag set by Planner when patching done)
+
+    Agent-completion rules
+    ----------------------
+    Planner is *finished* ⇢ **all four** of  
+        file_tree_computed, sbom_generated, vulns_fetched, vuln_analysis_done, patch_planned  
+        are True.
+
+    Classifier is *finished* ⇢ ecosystems_detected is True.
+
+    Global completion ⇢ every flag above is True - then call **Done** and stop.
+
+    ───────────────────  DECISION TREE  ───────────────────
+    1. If **global completion** ➜ `Done`
+    2. Else if **Planner not finished** ➜ call **Planner**
+    3. Else if **Classifier not finished** ➜ call **Classifier**
+    4. Else (both finished, but some final flag still False) ➜ **Yield**
+
+    **Important: Yield is ONLY valid in step 4.  
+    Never Yield while at least one agent is unfinished.**
+
+    Only one tool call per cycle.
     
-    **Decide if the work is complete by examining the current state (PatchetState), not by prior assumptions.**
+    Call Planner while patch_planned == False.
+	•	Once patch_planned == True, hand off to Patcher, if Patcher is available or call Done if its not available.
+	•	Never call Planner again after patch_planned is True
 
-    **Tool selection must be based on the current state (PatchetState), not on prior assumptions.**
-    '''
+    ───────────────────  EXAMPLE SEQUENCE  ───────────────────
+    • start (all False)           → Planner  
+    • file_tree_computed=True     → Classifier  
+    • ecosystems_detected=True    → Planner  
+    • sbom_generated=True         → Planner  
+    • vulns_fetched=True          → Planner  
+    • vuln_analysis_done=True     → Planner
+    - patch_planned=True          → Done
+
+    Always reevaluate flags each cycle; ignore any memory of earlier messages.
+    """
     
     def __init__(self):
         self.planner = Planner()
@@ -55,6 +73,9 @@ class Supervisor:
         # Classifier tool
         async def classifier_tool(state: PatchetState): 
             return await self.classifier.build_classifier().ainvoke(state)
+        
+        async def patcher_tool(state: PatchetState): 
+            pass
         
         self.suprevisor_graph = ReActAgent(self.supervisor_prompt, tools=[
             StructuredTool.from_function(self.planner.build_planner().ainvoke, name=self.planner.name, description=self.planner.__doc__),

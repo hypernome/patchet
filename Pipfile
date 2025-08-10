@@ -16,6 +16,10 @@ langchain-openai = "*"
 pyyaml = "*"
 requests = "*"
 tiktoken = "*"
+aiohttp = "*"
+aiodns = "*"
+brotli = "*"
+cvss = "*"
 
 [dev-packages]
 
