@@ -5,6 +5,14 @@ from util.constants import Constants
 from enum import Enum
 import yaml
 
+class PatchStatus(Enum): 
+    '''
+    Represents literal patch statuses.
+    '''
+    SUCCESS = "SUCCESS", 
+    FAIL = "FAIL", 
+    UNKNOWN = "UNKNOWN"
+
 class Severity(Enum): 
     '''
     Enum representing different severity values for vulnerabilities.
@@ -147,6 +155,14 @@ class PatchingAction(BaseModel):
     action: Literal["upgrade", "revert"]
     package: str
     to_version: str    
+
+class PatchResult(BaseModel): 
+    '''
+    Represents result of Patching.
+    '''
+    batch_name: str
+    target_manifest: str
+    status: PatchStatus
     
 class PatchingBatch(BaseModel): 
     '''
@@ -176,10 +192,10 @@ class PatchetState(BaseModel):
     vulns: list[dict] = []
     vuln_analysis: list[PackageUpgrade] | None = None
     patch_plan: PatchPlan | None = None
-    results: dict[str, dict] = {}
+    patch_results: dict = {}
     
     def default_exclusion_list(self): 
-        return ["messages", "input", "file_tree", "vulns", "vuln_analysis", "patch_plan"]
+        return ["messages", "input", "file_tree", "vulns", "vuln_analysis", "patch_plan", "patch_results"]
 
 class StateFlags(BaseModel): 
     '''
@@ -191,7 +207,7 @@ class StateFlags(BaseModel):
     vulns_fetched: bool = False
     vuln_analysis_done: bool = False
     patch_planned: bool = False
-    vulns_patched: bool = False
+    patch_completed: bool = False
     
     @staticmethod
     def create(state: PatchetState): 
@@ -202,7 +218,7 @@ class StateFlags(BaseModel):
         state_flags.vulns_fetched = True if state.vulns else False
         state_flags.vuln_analysis_done = True if state.vuln_analysis else False
         state_flags.patch_planned = True if state.patch_plan else False
-        state_flags.vulns_patched = True if state.results else False        
+        state_flags.patch_completed = True if state.patch_results else False        
         return state_flags
     
 def serialize_state(state: PatchetState, exclusions: list[str] = []) -> str: 

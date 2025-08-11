@@ -3,12 +3,18 @@ from langchain.tools import Tool, StructuredTool
 from langchain_core.messages import AIMessage
 from langgraph.graph import StateGraph, START, END
 from langsmith import traceable
-from typing import Callable, Literal
+from typing import Callable, Literal, Tuple
 from enum import Enum
 from state.state import PatchetState, serialize_state, serialize_state_flags
 import json, uuid, asyncio, inspect, tiktoken
 from tiktoken import Encoding
 from state.state import CURRENT_STATE
+
+class BootstrapTool: 
+    def __init__(self, tool: StructuredTool, args: dict | Callable[[PatchetState], dict]):
+        self.tool = tool
+        self.args = args
+        
 
 class InternalTools: 
     '''
@@ -42,19 +48,30 @@ class ReActAgent:
     Basic langgraph sub-graph based ReAct agent implementation.
     '''
         
-    def __init__(self, prompt: str = "<Tools>{tools_prompt}</Tools> \n<Input>{input}</Input>", tools: list[Tool] = [], 
-                 llm_name: str = "openai:gpt-4.1", conditionally_continue: Callable[[PatchetState], bool]  = None, 
-                 limit: int = -1, state_overrides: dict = {}, field_exclusion_func: Callable[[PatchetState], list[str]] = None, 
-                 state_serializer_func: Callable[[PatchetState, list[str]], str] = serialize_state):
+    def __init__(self, 
+                 prompt: str = "<Tools>{tools_prompt}</Tools> \n<Input>{input}</Input>", 
+                 tools: list[Tool] = [], 
+                 llm_name: str = "openai:gpt-4.1", 
+                 conditionally_continue: Callable[[PatchetState], bool]  = None, 
+                 limit: int = -1, 
+                 state_overrides: dict = {}, 
+                 field_exclusion_func: Callable[[PatchetState], list[str]] = None, 
+                 state_serializer_func: Callable[[PatchetState, list[str]], str] = serialize_state, 
+                 bootstrap_tool: BootstrapTool | None = None
+                 ):
         self.prompt = f"""
             {prompt if prompt else ""}\n\n<CurrentState>\n{{current_state}}\n</CurrentState>\n\n<StateFlags>\n{{state_flags}}\n</StateFlags>\n\n{{tools_prompt}} \n\n<Input>\n{{user_input}}\n</Input>\n
         """
-        self.tools = tools.extend([StructuredTool.from_function(InternalTools.Yield), StructuredTool.from_function(InternalTools.Done)])
+        tools.extend([StructuredTool.from_function(InternalTools.Yield), StructuredTool.from_function(InternalTools.Done)])
         
         self.tool_aware_llm = init_chat_model(llm_name, temperature=0.0).bind_tools(tools)        
         self.conditionally_continue = conditionally_continue
+        self.limit = limit
+        self.bootstrap_tool = bootstrap_tool
         if tools: 
             self.tools_by_name = {tool.name: tool for tool in tools}
+            if bootstrap_tool:
+                self.tools_by_name[bootstrap_tool.tool.name] = bootstrap_tool.tool
             self.tools_prompt = "".join(
                 [f"{index + 1}. {tool.name}({tool.args_schema}) - {tool.description}\n" for index, tool in enumerate(tools)]
             )
@@ -75,7 +92,7 @@ class ReActAgent:
             if isinstance(message, AIMessage): 
                 history.append(message)
             else:
-                history.append({"role": message["role"], "content": f"{message["content"]}", "tool_call_id": message["tool_call_id"]})
+                history.append({"role": message["role"], "content": str(message["content"]), "tool_call_id": message["tool_call_id"]})
         
         llm_advice = await self.tool_aware_llm.ainvoke(
             [
@@ -179,10 +196,14 @@ class ReActAgent:
         self.name = f"{name}_graph"
         self.id = uuid.uuid4()
         
+        # Add nodes in the graph
         graph.add_node(self.consult_llm.__name__, self.consult_llm)
         graph.add_node(self.run_tool.__name__, self.run_tool)
         graph.add_node(self.wind_up.__name__, self.wind_up)
-        graph.add_edge(START, self.consult_llm.__name__)
+        
+        # Add edges in the graph
+        start_from: str = self.run_tool.__name__ if self.bootstrap_tool else self.consult_llm.__name__
+        graph.add_edge(START, start_from)
         graph.add_conditional_edges(self.consult_llm.__name__, self.should_continue, { Decision.CONTINUE: self.run_tool.__name__, Decision.STOP: self.wind_up.__name__ })
         graph.add_edge(self.run_tool.__name__, self.consult_llm.__name__)
         graph.add_edge(self.wind_up.__name__, END)
@@ -228,11 +249,28 @@ class ReActAgent:
                 if field in PatchetState.model_fields: 
                     setattr(state, field, observation[field])
     
+    def optionally_bootstrap(self, state: PatchetState): 
+        '''
+        If bootstrap tool is provided adjust messages.
+        '''
+        if self.bootstrap_tool: 
+            state.messages = []
+            tool = self.bootstrap_tool.tool
+            args = self.bootstrap_tool.args(state) if callable(self.bootstrap_tool.args) else self.bootstrap_tool.args or {}
+            state.messages.append(
+                AIMessage(content="", tool_calls=[{
+                    "id": f"b:{uuid.uuid4()}", 
+                    "name": tool.name, 
+                    "args": args
+                }])
+            )
+    
     @traceable   
     async def ainvoke(self, state: PatchetState): 
         '''
         Async invocation for this graph.
         '''
+        self.optionally_bootstrap(state)
         if self.agent: 
           return await self.agent.ainvoke(state) 
     

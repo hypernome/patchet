@@ -1,8 +1,8 @@
 from langchain.tools import StructuredTool
 from agent.planner import Planner
 from agent.classifier import Classifier
+from agent.patcher import Patcher
 from agent.graph import ReActAgent
-from state.state import PatchetState
 
 class Supervisor: 
     '''
@@ -23,7 +23,8 @@ class Supervisor:
     sbom_generated
     vulns_fetched
     vuln_analysis_done 
-    patch_planned # (final flag set by Planner when patching done)
+    patch_planned 
+    patch_completed # (final flag set by Planner when patching done)
 
     Agent-completion rules
     ----------------------
@@ -57,7 +58,8 @@ class Supervisor:
     • sbom_generated=True         → Planner  
     • vulns_fetched=True          → Planner  
     • vuln_analysis_done=True     → Planner
-    - patch_planned=True          → Done
+    - patch_planned=True          → Patcher
+    - patch_completed=True        → Done
 
     Always reevaluate flags each cycle; ignore any memory of earlier messages.
     """
@@ -65,21 +67,12 @@ class Supervisor:
     def __init__(self):
         self.planner = Planner()
         self.classifier = Classifier()
-        
-        # Planner tool
-        async def planner_tool(state: PatchetState): 
-            return await self.planner.build_planner().ainvoke(state)
-        
-        # Classifier tool
-        async def classifier_tool(state: PatchetState): 
-            return await self.classifier.build_classifier().ainvoke(state)
-        
-        async def patcher_tool(state: PatchetState): 
-            pass
+        self.patcher = Patcher()
         
         self.suprevisor_graph = ReActAgent(self.supervisor_prompt, tools=[
             StructuredTool.from_function(self.planner.build_planner().ainvoke, name=self.planner.name, description=self.planner.__doc__),
-            StructuredTool.from_function(self.classifier.build_classifier().ainvoke, name=self.classifier.name, description=self.classifier.__doc__)
+            StructuredTool.from_function(self.classifier.build_classifier().ainvoke, name=self.classifier.name, description=self.classifier.__doc__),
+            StructuredTool.from_function(self.patcher.build_patcher().ainvoke, name=self.patcher.name, description=self.patcher.__doc__)
         ])        
     
     def build(self):
