@@ -20,8 +20,13 @@ aiohttp = "*"
 aiodns = "*"
 brotli = "*"
 cvss = "*"
+python-jose = "*"
+python-multipart = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
+respx = "*"
 
 [requires]
 python_version = "3.12"

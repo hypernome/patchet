@@ -3,16 +3,29 @@ from model.types import SBOMQuery
 from langchain.tools import StructuredTool
 from langsmith import traceable
 from agent.graph import ReActAgent, StrcturedAgent
-from endpoints.github import list_files as lf
-from endpoints.sbom import generate_sbom_and_vulns, generate_vuln_analysis, triage_vulns as tv
+from api.github import list_files as lf
+from api.osv import generate_sbom_and_vulns, generate_vuln_analysis, triage_vulns as tv
 from util.constants import Constants
+from util.environment import EnvVars
+from util.transport import RestClient, AuthProfileName
+import httpx, os
+
+httpx_client: httpx.AsyncClient = httpx.AsyncClient(timeout=15.0)
+_planner_auth_profile: AuthProfileName = AuthProfileName.planner
+api_url: str = os.getenv(EnvVars.API_URL.value)
+rest_client = RestClient()
 
 @traceable
-def list_files(repo: Repo) -> list[str]: 
+async def list_files(repo: Repo) -> list[str]: 
     '''
     Fetch the file tree from git repo and create a list of all files in the repo.
     '''
-    repo_files = lf(repo)
+    
+    list_files_uri: str = Constants.LIST_FILE_URI.value
+    async with await rest_client.client_with_token(_planner_auth_profile, "read:repo", "api.localhost.github") as client: 
+        response = await client.post(url=f"{api_url}{list_files_uri}", json=repo.model_dump())
+        response.raise_for_status()
+        repo_files = response.json()
     return {"file_tree": repo_files["repo_files"] if repo_files else []}
 
 @traceable
@@ -31,7 +44,10 @@ async def generate_sbom_with_vulns(repo: Repo, ecosystems: list[Ecosystem]) -> d
     7. Generate a list of mappings between purl and its vulnerabilities and populate the 'vulns' field of the state with it.    
     '''
     target: SbomTarget = SbomTarget.create(repo, ecosystems, start=500, stop=1499)
-    vulns = await generate_sbom_and_vulns(target, is_mocked=True)
+    async with await rest_client.client_with_token(_planner_auth_profile, "read:sbom", "api.localhost.osv") as client: 
+        response = await client.post(url=f"{api_url}{Constants.VULNS_URI.value}", params={ "is_mocked": True }, json=target.model_dump())
+        response.raise_for_status()
+        vulns = response.json()
     
     return {
         "sbom_ref": "./endpoints/fixtures/sbom.json",
@@ -69,7 +85,13 @@ async def triage_vulns() -> dict:
     This tool does not take any arguments and should be invoked the moment 'vulns_fetched' flag become True.
     '''
     state: PatchetState = CURRENT_STATE.get(Constants.CURRENT_STATE.value)
-    vuln_analysis: list[VulnAnalysisSpec] = await generate_vuln_analysis(VulnAnalysisRequest(vulns=state.vulns, ecosystems=state.ecosystems), is_mocked=True)
+    analysis_request: VulnAnalysisRequest = VulnAnalysisRequest(vulns=state.vulns, ecosystems=state.ecosystems)
+    async with await rest_client.client_with_token(_planner_auth_profile, "plan", "api.localhost.osv") as client: 
+        response = await client.post(url=f"{api_url}{Constants.VULNS_ANALYSIS_URI}", params={ "is_mocked": True }, json=analysis_request.model_dump())
+        response.raise_for_status()
+        vuln_analysis: list[VulnAnalysisSpec] = response.json()
+    
+    # vuln_analysis: list[VulnAnalysisSpec] = await generate_vuln_analysis(VulnAnalysisRequest(vulns=state.vulns, ecosystems=state.ecosystems), is_mocked=True)
     packageUpgrades: list[PackageUpgrade] = await tv(vuln_analysis)
         
     return {
@@ -148,12 +170,12 @@ async def create_patch_plan():
             Given the JSON list inside `<Input>…</Input>`, produce a minimal, safe, deterministic patch plan using only information present in the input (no outside knowledge, no web lookups, no tool calls).
 
             ## Objective
-            Create an ordered list of batches that upgrades every listed package to its `target_version`. Be conservative and purely name/field–driven.
+            Create an ordered list of batches that upgrades every listed package to its `target_version`. Be conservative and purely name/field-driven.
 
             ## Global rules
             - Use only the data provided in `<Input>…</Input>`.
             - Include every input item exactly once (no omissions, no duplicates).
-            - `to_version` must equal the item’s `target_version`.
+            - `to_version` must equal the item's `target_version`.
             - Use only “upgrade” actions (no rollback/revert).
             - Never mix different manifests in the same batch.
             - Never mix different ecosystems in the same batch.
@@ -193,7 +215,7 @@ async def create_patch_plan():
 
             ## Edge cases
             - If the same `package` string appears multiple times in the same manifest (rare), keep one action using the highest severity among those entries and the highest `target_version` by semver comparison; if versions are incomparable, choose the lexicographically greatest. (Remain deterministic.)
-            - If the same `package` appears under different manifests, plan it separately in each manifest’s sequence.
+            - If the same `package` appears under different manifests, plan it separately in each manifest's sequence.
             - If any `severity` is missing or unrecognized, treat it as UNKNOWN.
 
             **Input appears below between `<Input>` tags. Parse it as JSON and follow these rules exactly.**

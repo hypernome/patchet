@@ -1,27 +1,30 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from state.state import SbomTarget, VulnAnalysisRequest, VulnAnalysisSpec, Severity, PackageUpgrade
 from itertools import islice
 from util.environment import EnvVars
 from util.constants import Constants
-from endpoints.analysis import VulnAnalyzer
+from api.analysis import VulnAnalyzer
 from collections import defaultdict
 from packaging.version import Version
+from pathlib import Path
+from api.auth import require_auth
 import json, httpx, os
 
-sbom_router = APIRouter()
+sbom_router = APIRouter(prefix="/osv")
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
-@sbom_router.post("/sbom")
+@sbom_router.post("/vulns", dependencies=[Depends(require_auth(scopes=["read:sbom write:sbom"], audience="api.localhost.osv"))])
 async def generate_sbom_and_vulns(target: SbomTarget, is_mocked: bool = False): 
     '''
-    Generate sbom from the provided inputs and return a list of purls.
+    Generate sbom from the provided inputs, look up osv.dev for vulnerabilities by purls.
     '''
     try:
         if is_mocked: 
             print('Returning mocked vulns.')
-            with open('./endpoints/fixtures/vulns.json', 'r') as vulns_json: 
+            with open(FIXTURES_DIR / 'vulns.json', 'r') as vulns_json: 
                 vulns = json.load(vulns_json)
             return vulns
-        with open('./endpoints/fixtures/sbom.json', 'r') as sbom_json: 
+        with open(FIXTURES_DIR / 'sbom.json', 'r') as sbom_json: 
             sbom = json.load(sbom_json)
             purls_generator = ({"package": { "purl": c["purl"].replace('%40', '@')}} for c in sbom["components"] if c["type"] == "library")
             queries = { "queries": list(islice(purls_generator, target.start, target.stop if target.stop else None)) }
@@ -34,14 +37,14 @@ async def generate_sbom_and_vulns(target: SbomTarget, is_mocked: bool = False):
     except json.JSONDecodeError:
         print("Error: Invalid JSON format in 'data.json'.")
 
-@sbom_router.post("/analyze") 
+@sbom_router.post("/analyze", dependencies=[Depends(require_auth(scopes=["plan"], audience="api.localhost.osv"))]) 
 async def generate_vuln_analysis(request: VulnAnalysisRequest, is_mocked: bool = False) -> list[VulnAnalysisSpec]: 
     '''
     Generates an analyses on the available static
     '''
     try: 
         if is_mocked: 
-            with open('./endpoints/fixtures/analysis.json', 'r') as analysis_json: 
+            with open(FIXTURES_DIR / 'analysis.json', 'r') as analysis_json: 
                 analysis = json.load(analysis_json)
                 return [VulnAnalysisSpec(**v) for v in analysis]
         analyzer = VulnAnalyzer.create()
@@ -52,7 +55,7 @@ async def generate_vuln_analysis(request: VulnAnalysisRequest, is_mocked: bool =
     except json.JSONDecodeError:
         print("Error: Invalid JSON format in 'data.json'.")
 
-@sbom_router.post("/triage")
+@sbom_router.post("/triage", dependencies=[Depends(require_auth(scopes=["plan"], audience="api.localhost.osv"))])
 async def triage_vulns(analyzedVulns: list[VulnAnalysisSpec]) -> list[PackageUpgrade]: 
     '''
     Triage and group the provided vulnerabilities to represents a strcuture optimized for patching 
@@ -96,7 +99,7 @@ async def _batch_fetch(queries: dict, batch_size: int = 1000) -> list[dict] | No
     by the provided batch_size argument.
     '''
     osv_batch_uri = Constants.OSV_QUERY_URI.value
-    osv_base_url = os.environ[EnvVars.OSV_BASE_URL.value]
+    osv_base_url = os.getenv(EnvVars.OSV_BASE_URL.value)
     if not osv_base_url: 
         return
     
