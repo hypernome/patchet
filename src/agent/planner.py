@@ -7,13 +7,15 @@ from api.github import list_files as lf
 from api.osv import generate_sbom_and_vulns, generate_vuln_analysis, triage_vulns as tv
 from util.constants import Constants
 from util.environment import EnvVars
-from util.transport import RestClient, AuthProfileName
-import httpx, os
+from model.config import AuthProfileName
+from clientshim.secure_model import AgentSpec
+from clientshim.secure_client import get_secure_client, SecureClient, AuthMode
+from intentmodel.intent_model import AgentComponents, Tool
+from util.tracing import TraceableClient
+import os, inspect
 
-httpx_client: httpx.AsyncClient = httpx.AsyncClient(timeout=15.0)
-_planner_auth_profile: AuthProfileName = AuthProfileName.planner
 api_url: str = os.getenv(EnvVars.API_URL.value)
-rest_client = RestClient()
+_intent_auth_mode: bool = bool(os.getenv(EnvVars.INTENT_AUTH_MODE.value, "False").lower() == 'true')
 
 @traceable
 async def list_files(repo: Repo) -> list[str]: 
@@ -22,10 +24,16 @@ async def list_files(repo: Repo) -> list[str]:
     '''
     
     list_files_uri: str = Constants.LIST_FILE_URI.value
-    async with await rest_client.client_with_token(_planner_auth_profile, "read:repo", "api.localhost.github") as client: 
+    async with get_secure_client().authenticated_request(
+        "read:repo", 
+        audience="api.localhost.github", 
+        auth_profile_nane=AuthProfileName.planner, 
+        mode=AuthMode.intent if _intent_auth_mode else AuthMode.oauth
+        ) as client: 
         response = await client.post(url=f"{api_url}{list_files_uri}", json=repo.model_dump())
         response.raise_for_status()
-        repo_files = response.json()
+        repo_files = response.json()    
+    
     return {"file_tree": repo_files["repo_files"] if repo_files else []}
 
 @traceable
@@ -44,7 +52,13 @@ async def generate_sbom_with_vulns(repo: Repo, ecosystems: list[Ecosystem]) -> d
     7. Generate a list of mappings between purl and its vulnerabilities and populate the 'vulns' field of the state with it.    
     '''
     target: SbomTarget = SbomTarget.create(repo, ecosystems, start=500, stop=1499)
-    async with await rest_client.client_with_token(_planner_auth_profile, "read:sbom", "api.localhost.osv") as client: 
+    async with get_secure_client().authenticated_request(
+        "read:sbom", 
+        "write:sbom", 
+        audience="api.localhost.osv", 
+        auth_profile_nane=AuthProfileName.planner, 
+        mode=AuthMode.intent if _intent_auth_mode else AuthMode.oauth
+        ) as client:        
         response = await client.post(url=f"{api_url}{Constants.VULNS_URI.value}", params={ "is_mocked": True }, json=target.model_dump())
         response.raise_for_status()
         vulns = response.json()
@@ -86,10 +100,17 @@ async def triage_vulns() -> dict:
     '''
     state: PatchetState = CURRENT_STATE.get(Constants.CURRENT_STATE.value)
     analysis_request: VulnAnalysisRequest = VulnAnalysisRequest(vulns=state.vulns, ecosystems=state.ecosystems)
-    async with await rest_client.client_with_token(_planner_auth_profile, "plan", "api.localhost.osv") as client: 
-        response = await client.post(url=f"{api_url}{Constants.VULNS_ANALYSIS_URI}", params={ "is_mocked": True }, json=analysis_request.model_dump())
+    
+    async with get_secure_client().authenticated_request(
+        "plan", 
+        audience="api.localhost.osv", 
+        auth_profile_nane=AuthProfileName.planner, 
+        mode=AuthMode.intent if _intent_auth_mode else AuthMode.oauth
+        ) as client:
+        response = await client.post(url=f"{api_url}{Constants.VULNS_ANALYSIS_URI.value}", params={ "is_mocked": True }, json=analysis_request.model_dump())
         response.raise_for_status()
-        vuln_analysis: list[VulnAnalysisSpec] = response.json()
+        response_data = response.json()
+        vuln_analysis: list[VulnAnalysisSpec] = [VulnAnalysisSpec.model_validate(item) for item in response_data]
     
     # vuln_analysis: list[VulnAnalysisSpec] = await generate_vuln_analysis(VulnAnalysisRequest(vulns=state.vulns, ecosystems=state.ecosystems), is_mocked=True)
     packageUpgrades: list[PackageUpgrade] = await tv(vuln_analysis)
@@ -295,8 +316,24 @@ class Planner:
     def build_planner(self): 
         return self.agent_graph.build(recompile=True)
 
+    def agent_spec(self): 
+        return AgentSpec(
+            agent_id=self.name, 
+            agent_bridge=Planner, 
+            prompt=self.agent_graph.prompt, 
+            tools=[tool.func for tool in self.agent_graph.tools_by_name.values()]
+        )
     
-    
+    def agent_components(self): 
+        return AgentComponents(
+            agent_id=self.name, 
+            prompt_template=self.agent_graph.prompt, 
+            tools=[Tool(
+                name=tool.func.__name__, 
+                signature=str(inspect.signature(tool.func)), 
+                description=tool.func.__doc__
+            ) for tool in self.agent_graph.tools_by_name.values()]
+        )
 
 
 

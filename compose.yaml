@@ -25,7 +25,6 @@ services:
       - OSV_BASE_URL=https://api.osv.dev
     depends_on: [idp]
 
-  # one-shot: runs your scripted scenarios against the API + IDP
   demo:
     build:
       context: .

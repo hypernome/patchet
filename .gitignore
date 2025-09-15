@@ -171,3 +171,9 @@ notebooks/
 # .vscode
 .vscode/
 
+# Scratch work
+scratch/
+
+# os specific
+**/.DS_Store
+

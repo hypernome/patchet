@@ -13,7 +13,7 @@ import json, httpx, os
 sbom_router = APIRouter(prefix="/osv")
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
-@sbom_router.post("/vulns", dependencies=[Depends(require_auth(scopes=["read:sbom write:sbom"], audience="api.localhost.osv"))])
+@sbom_router.post("/vulns", dependencies=[Depends(require_auth(scopes=["read:sbom","write:sbom"], audience="api.localhost.osv"))])
 async def generate_sbom_and_vulns(target: SbomTarget, is_mocked: bool = False): 
     '''
     Generate sbom from the provided inputs, look up osv.dev for vulnerabilities by purls.

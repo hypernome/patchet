@@ -71,7 +71,15 @@ class JWTSignatureMiddleware(BaseHTTPMiddleware):
         self.issuer = issuer
         self.algorithms = algorithms or ["RS256"]
         self.clock_skew = clock_skew_seconds
-        self.exempt = set(exempt_paths or ["/health", "/docs", "/openapi.json"])
+        self.exempt = set(exempt_paths or [
+            "/health", 
+            "/docs", 
+            "/openapi.json", 
+            "/oauth/token", 
+            "/oauth/.well-known/jwks.json", 
+            "/oauth/introspect", 
+            "/oauth/whoami"
+        ])
         self.jwks = _JWKSCache(jwks_url, ttl_seconds=int(os.getenv("JWKS_TTL", "600")))
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
@@ -117,12 +125,13 @@ class JWTSignatureMiddleware(BaseHTTPMiddleware):
 
 def install_signature_middleware(app: FastAPI):
     idp_url: str = os.getenv(EnvVars.IDP_URL.value, "http://idp.localhost")
+    exempt_paths = os.getenv("AUTH_EXEMPT_PATHS", None)
     app.add_middleware(
         JWTSignatureMiddleware,
         jwks_url=f"{idp_url}/oauth/.well-known/jwks.json",
         issuer=os.getenv(EnvVars.EXPECTED_ISS.value, "http://idp.localhost"),
         clock_skew_seconds=int(os.getenv("CLOCK_SKEW_SECONDS","60")),
-        exempt_paths=(os.getenv("AUTH_EXEMPT_PATHS","/health,/docs,/openapi.json").split(",")),
+        exempt_paths=(exempt_paths.split(",") if exempt_paths else None),
     )
 
 # ---------- 2) Per-endpoint dependency enforcing audience + scopes ----------
@@ -135,7 +144,6 @@ def _claim_scopes(claims: dict) -> set[str]:
     return set()
 
 def require_auth(scopes: Iterable[str] | str = (), audience: Optional[str] = None):
-    """Use in route `dependencies=[Depends(require_auth(...))]`."""
     req_scopes = scopes.split() if isinstance(scopes, str) else list(scopes or [])
     need = set(req_scopes)
 

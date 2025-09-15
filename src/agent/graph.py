@@ -282,7 +282,6 @@ class ReActAgent:
         if self.agent: 
           return self.agent.invoke(state)
 
-
 class StrcturedAgent: 
     '''
     Basic Structured agent implementation.

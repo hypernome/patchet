@@ -12,4 +12,4 @@ app.include_router(sbom_router)
 
 @app.get("/health")
 def health(): 
-    return { "ok": True } 
+    return { "ok": True, "message": "API Running!" } 

@@ -3,6 +3,9 @@ from util.constants import Constants
 from langsmith import traceable
 from langchain.tools import StructuredTool
 from agent.graph import ReActAgent, BootstrapTool
+from clientshim.secure_model import AgentSpec
+from intentmodel.intent_model import AgentComponents, Tool
+import inspect
 
 @traceable
 def bump_versions(): 
@@ -110,4 +113,21 @@ class Patcher:
     def build_patcher(self): 
         return self.agent_graph.build(recompile=True)
     
+    def agent_spec(self): 
+        return AgentSpec(
+            agent_id=self.name, 
+            agent_bridge=Patcher, 
+            prompt=self.agent_graph.prompt, 
+            tools=[tool.func for tool in self.agent_graph.tools_by_name.values()]
+        )
     
+    def agent_components(self): 
+        return AgentComponents(
+            agent_id=self.name, 
+            prompt_template=self.agent_graph.prompt, 
+            tools=[Tool(
+                name=tool.func.__name__, 
+                signature=str(inspect.signature(tool.func)), 
+                description=tool.func.__doc__
+            ) for tool in self.agent_graph.tools_by_name.values()]
+        )

@@ -6,7 +6,9 @@ from pathlib import PurePosixPath as P
 from collections import defaultdict
 from state.state import CURRENT_STATE
 from util.constants import Constants
-import random, yaml, fnmatch
+from clientshim.secure_model import AgentSpec
+from intentmodel.intent_model import AgentComponents, Tool
+import random, yaml, fnmatch, inspect
 
 @traceable
 def search_patterns_in_file_tree(ecosystems: list[Ecosystem]): 
@@ -205,4 +207,22 @@ class Classifier:
         Build and return the compiled classifier agent.
         '''
         return self.classifier.build(recompile=True)
-            
+    
+    def agent_spec(self): 
+        return AgentSpec(
+            agent_id=self.name, 
+            agent_bridge=Classifier, 
+            prompt=self.classifier.prompt, 
+            tools=[tool.func for tool in self.classifier.tools_by_name.values()]
+        )
+    
+    def agent_components(self): 
+        return AgentComponents(
+            agent_id=self.name, 
+            prompt_template=self.classifier.prompt, 
+            tools=[Tool(
+                name=tool.func.__name__, 
+                signature=str(inspect.signature(tool.func)), 
+                description=tool.func.__doc__
+            ) for tool in self.classifier.tools_by_name.values()]
+        )      
