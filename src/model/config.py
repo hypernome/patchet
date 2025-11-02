@@ -8,6 +8,7 @@ class AuthProfileName(Enum):
     supervisor = "supervisor"
     admin = "admin"
     intent_registration_admin = "intent_registration_admin"
+    patchet = "patchet"
 
 class GrantType(Enum): 
     authorization_code = "authorization_code"
@@ -67,5 +68,15 @@ token_profiles: dict[AuthProfileName, AuthProfile] = {
             audience=""
         ), 
         description="Admin token profile."
+    ), 
+    AuthProfileName.patchet: AuthProfile(
+        id=AuthProfileName.patchet,
+        config=OAuthConfig(
+            client_id=AuthProfileName.patchet.value, 
+            client_secret="patchet-admin", 
+            scope="", 
+            audience=""
+        ), 
+        description="Patchet demo client."
     )
 }

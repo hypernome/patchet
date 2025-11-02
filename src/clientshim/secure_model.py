@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Callable, Dict, Any
 from dataclasses import dataclass
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from enum import Enum
 
 class AgentSpec(BaseModel): 
@@ -12,6 +13,7 @@ class AgentSpec(BaseModel):
     agent_bridge: Callable | object
     prompt: str
     tools: List[Callable]
+    tools_map: Dict[str, Callable]
     configuration: Dict = {}   
 
 @dataclass
@@ -27,6 +29,7 @@ class AgentIdentity:
     wrapped_tools: Dict[str, Any]
     configuration: Dict[str, Any]
     registered_at: float
+    private_key: RSAPrivateKey | None = None
 
 @dataclass 
 class TokenResponse:

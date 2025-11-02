@@ -10,3 +10,4 @@ class Constants(Enum):
     TRIAGE_URI = '/osv/triage'
     CURRENT_STATE = "current_state"
     LIST_FILE_URI = '/github/listfiles'
+    PATCHING_URI = '/github/patch'

@@ -2,8 +2,9 @@ from langchain.tools import StructuredTool, Tool
 from agent.planner import Planner
 from agent.classifier import Classifier
 from agent.patcher import Patcher
-from agent.graph import ReActAgent
+from agent.graph import ReActAgent, ToolSpec, internal_tools_funcs
 from clientshim.secure_model import AgentSpec
+from clientshim.secure_client import register_tools
 from intentmodel.intent_model import AgentComponents, Tool
 import inspect
 
@@ -72,12 +73,18 @@ class Supervisor:
         self.planner = Planner()
         self.classifier = Classifier()
         self.patcher = Patcher()
+        self.tool_funcs = []
         
-        self.supervisor_graph = ReActAgent(self.supervisor_prompt, tools=[
-            StructuredTool.from_function(self.planner.build_planner().ainvoke, name=self.planner.name, description=self.planner.__doc__),
-            StructuredTool.from_function(self.classifier.build_classifier().ainvoke, name=self.classifier.name, description=self.classifier.__doc__),
-            StructuredTool.from_function(self.patcher.build_patcher().ainvoke, name=self.patcher.name, description=self.patcher.__doc__)
-        ])        
+        self.supervisor_graph = ReActAgent(
+            id=self.name,
+            prompt=self.supervisor_prompt, 
+            tool_specs=[
+                ToolSpec(self.planner.build_planner().ainvoke, name=self.planner.name, description=self.planner.__doc__, is_agent=True),
+                ToolSpec(self.classifier.build_classifier().ainvoke, name=self.classifier.name, description=self.classifier.__doc__, is_agent=True),
+                ToolSpec(self.patcher.build_patcher().ainvoke, name=self.patcher.name, description=self.patcher.__doc__, is_agent=True)
+            ])
+        
+        # register_tools(self.supervisor_graph.real_tool_specs())       
     
     def build(self):
         return self.supervisor_graph.build(recompile=True)
@@ -87,7 +94,10 @@ class Supervisor:
             agent_id=self.name, 
             agent_bridge=Supervisor, 
             prompt=self.supervisor_graph.prompt, 
-            tools=[tool.func for tool in self.supervisor_graph.tools_by_name.values()]
+            tools=[tool.func for tool in self.supervisor_graph.tools_by_name.values()], 
+            tools_map={f"{toolname}_ainvoke" if tool.func.__qualname__ == ReActAgent.ainvoke.__qualname__ else toolname: tool.func 
+                    for toolname, tool in self.supervisor_graph.tools_by_name.items()
+                }
         )
     
     def agent_components(self): 
@@ -95,9 +105,9 @@ class Supervisor:
             agent_id=self.name, 
             prompt_template=self.supervisor_graph.prompt, 
             tools=[Tool(
-                name=tool.func.__name__, 
-                signature=str(inspect.signature(tool.func)), 
-                description=tool.func.__doc__ 
-            ) for tool in self.supervisor_graph.tools_by_name.values()]
+                name=f.__name__ if f.__qualname__ != ReActAgent.ainvoke.__qualname__ else f"{n}", 
+                signature=str(inspect.signature(f)), 
+                description=d
+            ) for f, n, d in [(ts.original_func, ts.name, ts.description) for ts in self.supervisor_graph.real_tool_specs()]]
         ) 
     

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import langsmith as ls
 import httpx, uuid
 
@@ -17,13 +18,12 @@ class TraceableClient:
     async def post(self, url: str, **kwargs): 
         with ls.trace(
             name="http_request", 
-            run_id=uuid.uuid4(), 
-            run_type="agent_tool", 
+            run_type="tool", 
             inputs={
                 "method": "POST", 
                 "url": url, 
                 "body": kwargs.get('json', {}), 
-                "headers": kwargs.get('headers', {})
+                "headers": self.original_client.headers
             }
         ) as run: 
             response = await self.original_client.post(url, **kwargs)
@@ -40,13 +40,12 @@ class TraceableClient:
     async def get(self, url: str, **kwargs): 
         with ls.trace(
             name="http_request", 
-            run_id=uuid.uuid4(), 
-            run_type="agent_tool", 
+            run_type="tool", 
             inputs={
                 "method": "GET", 
                 "url": url, 
                 "params": kwargs.get('params', {}), 
-                "headers": kwargs.get('headers', {})
+                "headers": self.original_client.headers
             }
         ) as run: 
             response = await self.original_client.get(url, **kwargs)
@@ -59,6 +58,3 @@ class TraceableClient:
                 }
             )
             return response
-    
-    async def get(url: str, **kwargs): 
-        pass

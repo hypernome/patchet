@@ -2,22 +2,22 @@ from state.state import Repo, Ecosystem, VulnAnalysisRequest, VulnAnalysisSpec, 
 from model.types import SBOMQuery
 from langchain.tools import StructuredTool
 from langsmith import traceable
-from agent.graph import ReActAgent, StrcturedAgent
+from agent.graph import ReActAgent, StrcturedAgent, ToolSpec
 from api.github import list_files as lf
 from api.osv import generate_sbom_and_vulns, generate_vuln_analysis, triage_vulns as tv
 from util.constants import Constants
-from util.environment import EnvVars
+from util.environment import EnvVars, is_intent_mode_on
 from model.config import AuthProfileName
 from clientshim.secure_model import AgentSpec
-from clientshim.secure_client import get_secure_client, SecureClient, AuthMode
+from clientshim.secure_client import get_secure_client, AuthMode, secure_tool
 from intentmodel.intent_model import AgentComponents, Tool
 from util.tracing import TraceableClient
 import os, inspect
 
 api_url: str = os.getenv(EnvVars.API_URL.value)
-_intent_auth_mode: bool = bool(os.getenv(EnvVars.INTENT_AUTH_MODE.value, "False").lower() == 'true')
 
 @traceable
+@secure_tool()
 async def list_files(repo: Repo) -> list[str]: 
     '''
     Fetch the file tree from git repo and create a list of all files in the repo.
@@ -27,16 +27,18 @@ async def list_files(repo: Repo) -> list[str]:
     async with get_secure_client().authenticated_request(
         "read:repo", 
         audience="api.localhost.github", 
-        auth_profile_nane=AuthProfileName.planner, 
-        mode=AuthMode.intent if _intent_auth_mode else AuthMode.oauth
-        ) as client: 
-        response = await client.post(url=f"{api_url}{list_files_uri}", json=repo.model_dump())
-        response.raise_for_status()
-        repo_files = response.json()    
+        auth_profile_name=AuthProfileName.planner, 
+        mode=AuthMode.intent if is_intent_mode_on() else AuthMode.oauth
+        ) as http_client:
+        async with TraceableClient(http_client) as client:  
+            response = await client.post(url=f"{api_url}{list_files_uri}", json=repo.model_dump())
+            response.raise_for_status()
+            repo_files = response.json()    
     
     return {"file_tree": repo_files["repo_files"] if repo_files else []}
 
 @traceable
+@secure_tool()
 async def generate_sbom_with_vulns(repo: Repo, ecosystems: list[Ecosystem]) -> dict: 
     '''
     Takes the repo and all the globs representing a manifest file in git repo and generates 
@@ -56,12 +58,13 @@ async def generate_sbom_with_vulns(repo: Repo, ecosystems: list[Ecosystem]) -> d
         "read:sbom", 
         "write:sbom", 
         audience="api.localhost.osv", 
-        auth_profile_nane=AuthProfileName.planner, 
-        mode=AuthMode.intent if _intent_auth_mode else AuthMode.oauth
-        ) as client:        
-        response = await client.post(url=f"{api_url}{Constants.VULNS_URI.value}", params={ "is_mocked": True }, json=target.model_dump())
-        response.raise_for_status()
-        vulns = response.json()
+        auth_profile_name=AuthProfileName.planner, 
+        mode=AuthMode.intent if is_intent_mode_on() else AuthMode.oauth
+        ) as http_client:        
+        async with TraceableClient(http_client) as client: 
+            response = await client.post(url=f"{api_url}{Constants.VULNS_URI.value}", params={ "is_mocked": True }, json=target.model_dump())
+            response.raise_for_status()
+            vulns = response.json()
     
     return {
         "sbom_ref": "./endpoints/fixtures/sbom.json",
@@ -69,6 +72,7 @@ async def generate_sbom_with_vulns(repo: Repo, ecosystems: list[Ecosystem]) -> d
     }
 
 @traceable
+@secure_tool()
 def search_sbom_index(sbom_query: SBOMQuery) -> dict: 
     '''
     Search the SBOM Index by a CVE affected package and find out if the repo has 
@@ -86,6 +90,7 @@ def search_sbom_index(sbom_query: SBOMQuery) -> dict:
     }
 
 @traceable
+@secure_tool()
 async def triage_vulns() -> dict:
     '''
     This tool is used to triage vulnerabilities present in the provided list of vulnerabilities. For 
@@ -104,13 +109,15 @@ async def triage_vulns() -> dict:
     async with get_secure_client().authenticated_request(
         "plan", 
         audience="api.localhost.osv", 
-        auth_profile_nane=AuthProfileName.planner, 
-        mode=AuthMode.intent if _intent_auth_mode else AuthMode.oauth
-        ) as client:
-        response = await client.post(url=f"{api_url}{Constants.VULNS_ANALYSIS_URI.value}", params={ "is_mocked": True }, json=analysis_request.model_dump())
-        response.raise_for_status()
-        response_data = response.json()
-        vuln_analysis: list[VulnAnalysisSpec] = [VulnAnalysisSpec.model_validate(item) for item in response_data]
+        auth_profile_name=AuthProfileName.planner, 
+        mode=AuthMode.intent if is_intent_mode_on() else AuthMode.oauth
+        ) as http_client:
+        
+        async with TraceableClient(http_client) as client:        
+            response = await client.post(url=f"{api_url}{Constants.VULNS_ANALYSIS_URI.value}", params={ "is_mocked": True }, json=analysis_request.model_dump())
+            response.raise_for_status()
+            response_data = response.json()
+            vuln_analysis: list[VulnAnalysisSpec] = [VulnAnalysisSpec.model_validate(item) for item in response_data]
     
     # vuln_analysis: list[VulnAnalysisSpec] = await generate_vuln_analysis(VulnAnalysisRequest(vulns=state.vulns, ecosystems=state.ecosystems), is_mocked=True)
     packageUpgrades: list[PackageUpgrade] = await tv(vuln_analysis)
@@ -120,6 +127,7 @@ async def triage_vulns() -> dict:
     }
     
 @traceable
+@secure_tool()
 def derive_dep_graph(): 
     '''
     This tool derives the dependency graph required for planning the batches to perform patching.
@@ -147,6 +155,7 @@ def derive_dep_graph():
     """
     
 @traceable
+@secure_tool()
 async def create_patch_plan(): 
     '''
     This tool creates the patch plan. Which is the terminal goal for this Planner agent.
@@ -300,15 +309,11 @@ class Planner:
     
     def __init__(self):
         self.name = "Planner"
-        self.planner_tools = [
-            StructuredTool.from_function(list_files), 
-            StructuredTool.from_function(generate_sbom_with_vulns), 
-            StructuredTool.from_function(triage_vulns),
-            StructuredTool.from_function(create_patch_plan)
-        ]
+        self.tool_funcs = [list_files, generate_sbom_with_vulns, triage_vulns, create_patch_plan]
         self.agent_graph = ReActAgent(
-            self.planner_prompt, 
-            self.planner_tools, 
+            id=self.name,
+            prompt=self.planner_prompt, 
+            tool_specs=[ToolSpec(func) for func in self.tool_funcs],
             limit=10, 
         )
     
@@ -321,7 +326,10 @@ class Planner:
             agent_id=self.name, 
             agent_bridge=Planner, 
             prompt=self.agent_graph.prompt, 
-            tools=[tool.func for tool in self.agent_graph.tools_by_name.values()]
+            tools=[tool.func for tool in self.agent_graph.tools_by_name.values()], 
+            tools_map={f"{toolname}_ainvoke" if tool.func.__qualname__ == ReActAgent.ainvoke.__qualname__ else toolname: tool.func 
+                    for toolname, tool in self.agent_graph.tools_by_name.items()
+                }
         )
     
     def agent_components(self): 
@@ -329,10 +337,10 @@ class Planner:
             agent_id=self.name, 
             prompt_template=self.agent_graph.prompt, 
             tools=[Tool(
-                name=tool.func.__name__, 
-                signature=str(inspect.signature(tool.func)), 
-                description=tool.func.__doc__
-            ) for tool in self.agent_graph.tools_by_name.values()]
+                name=name, 
+                signature=str(inspect.signature(func)), 
+                description=description
+            ) for func, name, description in [(spec.original_func, spec.name, spec.description) for spec in self.agent_graph.real_tool_specs()]]
         )
 
 

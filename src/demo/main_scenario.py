@@ -1,34 +1,13 @@
-from agent.supervisor import Supervisor
-from state.state import PatchetState, Trigger, RepoEvent, Repo
-
-initial_state = PatchetState(
-    input="Patch all known critical CVEs in this repo.",
-
-    trigger=Trigger(
-        type="push",
-        impacted_repo_ids=["juice-shop/juice-shop"],
-        change_event=RepoEvent(
-            id="evt1",
-            repo=Repo(
-                owner="juice-shop",
-                name="juice-shop",
-                branch="v11.1.3"
-            ),
-            commit="bac42662a7abc1e051133b9dd0f57a10b1d88187",
-            package=None  # or "" if required
-        )
-    ),
-    agent_trail=[],             
-    file_tree=[],               
-    ecosystems=[],
-    sbom_ref=None,
-    vulns=[],  
-    results={}
-)
+from agent.graph import ReActAgent
+from demo.initial_state import initial_state
+from clientshim.secure_client import get_secure_client
 
 async def start(): 
     """
     Start the Supervisor agent.
     """
-    supervisor_graph = Supervisor().build()
+    
+    secure_client = get_secure_client()
+    
+    supervisor_graph: ReActAgent = secure_client.get_agent("Supervisor")
     await supervisor_graph.ainvoke(initial_state)

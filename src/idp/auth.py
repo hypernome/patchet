@@ -77,6 +77,7 @@ class JWTSignatureMiddleware(BaseHTTPMiddleware):
             "/openapi.json", 
             "/oauth/token", 
             "/oauth/.well-known/jwks.json", 
+            "/oauth/.well-known/openid-configuration",
             "/oauth/introspect", 
             "/oauth/whoami"
         ])
@@ -170,6 +171,7 @@ def require_auth(scopes: Iterable[str] | str = (), audience: Optional[str] = Non
             missing = [s for s in need if s not in have]
             if missing:
                 raise HTTPException(403, f"Missing required scope(s): {', '.join(missing)}")
+            request.state.scopes = have
 
         # Optionally expose convenience fields
         request.state.subject = claims.get("sub")

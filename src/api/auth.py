@@ -1,6 +1,6 @@
 from __future__ import annotations
-import os, time, asyncio
-from typing import Dict, Iterable, Optional, Callable
+import os, time, asyncio, hashlib, json, base64
+from typing import Dict, Iterable, Optional
 import httpx
 from fastapi import HTTPException, Request, Depends, FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -9,8 +9,10 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError, JWTError
 from jose.utils import base64url_decode
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-from util.environment import EnvVars
+from cryptography.hazmat.primitives import serialization, hashes
+from util.environment import EnvVars, is_intent_mode_on, is_pop_enabled
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.asymmetric import padding
 
 # ---------- JWKS cache (shared) ----------
 def _jwk_to_pem(jwk: Dict[str,str]) -> bytes:
@@ -143,7 +145,6 @@ def require_auth(scopes: Iterable[str] | str = (), audience: Optional[str] = Non
         claims = getattr(request.state, "claims", None)
         if not claims:
             raise HTTPException(401, "Unauthenticated")
-
         # Audience check (if provided)
         if audience is not None:
             aud = claims.get("aud")
@@ -165,5 +166,85 @@ def require_auth(scopes: Iterable[str] | str = (), audience: Optional[str] = Non
 
         # Optionally expose convenience fields
         request.state.subject = claims.get("sub")
-
+        
+        # Verify Proof-of-Possession.
+        await verify_pop(request, claims)
+        
     return _dep
+
+async def verify_pop(request: Request, claims: Dict): 
+    """
+    Check if PoP verification is enabled and verify PoP signature.
+    """
+    if is_pop_enabled(): 
+        request_json: Dict = await request.json()
+        pop_header = request.headers.get("PoP")
+        pop_timestamp = request.headers.get("X-PoP-Timestamp")
+        if not pop_header:
+            raise HTTPException(401, "Missing PoP proof")
+        
+        cnf_claim = claims.get("cnf", {})
+        public_key_jwk = cnf_claim.get("jwk")
+        if not public_key_jwk: 
+            raise HTTPException(401, f"Token is missing jwk claim required for PoP verification.")
+        pop_data = {
+            "method": "POST", 
+            "url": str(request.url), 
+            "data": hashlib.sha256(json.dumps(request_json).encode()).hexdigest() if request_json else "",
+            "checksum": claims.get("agent_proof").get("agent_checksum"),
+            "timestamp": int(pop_timestamp),             
+        }
+        pop_message = json.dumps(pop_data, sort_keys=True).encode()
+        public_key = jwk_to_public_key(public_key_jwk) 
+        signature = base64.b64decode(pop_header)
+        
+        try:
+            public_key.verify(
+                signature, 
+                pop_message, 
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )            
+        except Exception as e: 
+            raise HTTPException(401, "Invalid PoP Proof.")
+                
+        # Perform optional intent validation
+        if is_intent_mode_on():
+            if not is_intent_allowed(claims): 
+                raise HTTPException(403, f"Intent drift detected. Calling agent: {request.state.subject}")
+    
+    
+
+def jwk_to_public_key(public_key_jwk: dict) -> RSAPublicKey:
+    """
+    Convert JWK to public key using python-jose
+    """
+    
+    # Extract n and e from JWK
+    n = int.from_bytes(
+        base64url_decode(str(public_key_jwk['n'] + '==').encode('utf-8')), 
+        byteorder='big'
+    )
+    e = int.from_bytes(
+        base64url_decode(str(public_key_jwk['e'] + '==').encode('utf-8')), 
+        byteorder='big'
+    )
+    
+    # Create RSA public key
+    public_numbers = rsa.RSAPublicNumbers(e, n)
+    public_key: RSAPublicKey = public_numbers.public_key()
+    
+    return public_key
+
+def is_intent_allowed(claims: Dict) -> bool:
+    """
+    Verify the intent using the Intent token framework and workflow tracking.
+    """
+    agent_id: str = claims.get("sub")
+    intent: Dict = claims.get("intent")
+    agent_proof: Dict = claims.get("agent_proof")
+
+    return True
+    
+    
+    

@@ -19,14 +19,53 @@ ALG = "RS256"
 CLIENTS: Dict[str, Dict] = {
     "planner": {
         "client_secret": "planner-secret",
-        "scopes": ["classify", "plan", "read:repo", "read:sbom", "write:sbom"],
-        "audiences": ["api.localhost.github", "api.localhost.osv"],
+        "scopes": [
+            "classify", 
+            "plan", 
+            "read:repo", 
+            "read:sbom", 
+            "write:sbom",
+            "write:deployment",  
+            "approve:deployment", 
+            "read:file:config.json", 
+            "payment:initiate", 
+            "sr:start", 
+            "sr:approve", 
+            "agent:metadata:read"
+        ],
+        "audiences": [
+            "api.localhost.github", 
+            "api.localhost.osv", 
+            "api.localhost.deploy", 
+            "api.localhost.files", 
+            "api.localhost.payment", 
+            "api.localhost.sr", 
+            "api.localhost.data"
+        ],
         "tenant": "org:hypernome"
     },
     "patcher": {
         "client_secret": "executor-secret",
-        "scopes": ["patch", "write:repo", "create:pr"],
-        "audiences": ["api.localhost.github"],
+        "scopes": [
+            "patch", 
+            "write:repo", 
+            "create:pr",
+            "deploy:production", 
+            "write:files:all", 
+            "payment:initiate", 
+            "payment:execute", 
+            "sr:execute", 
+            "data:process", 
+        ],
+        "audiences": [
+            "api.localhost.github", 
+            "api.localhost.osv", 
+            "api.localhost.deploy", 
+            "api.localhost.files", 
+            "api.localhost.payment", 
+            "api.localhost.sr", 
+            "api.localhost.data"
+        ],
         "tenant": "org:hypernome"
     },
     "intent_registration_admin": {
@@ -38,8 +77,14 @@ CLIENTS: Dict[str, Dict] = {
     # Add an intentionally over-scoped client for threat reproduction:
     "admin": {
         "client_secret": "too-much",
-        "scopes": ["classify","plan","patch","write:repo","create:pr","read:repo","read:sbom"],
+        "scopes": ["classify","plan","patch","write:repo","create:pr","read:repo","read:sbom, read:agents"],
         "audiences": ["api.localhost.github", "api.localhost.osv"],
+        "tenant": "org:hypernome"
+    }, 
+    "patchet": {
+        "client_secret": "patchet-admin",
+        "scopes": ["read:agents", "generate:intent-token"],
+        "audiences": ["idp.localhost"],
         "tenant": "org:hypernome"
     }
 }
@@ -107,6 +152,10 @@ def issue_jwt(client_id: str, scopes: List[str], audience: List[str], extra: Dic
     )
 
 @oauth_router.get("/.well-known/jwks.json")
+def jwks():
+    return JSONResponse(JWKS)
+
+@oauth_router.get("/.well-known/openid-configuration")
 def jwks():
     return JSONResponse(JWKS)
 

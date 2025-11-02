@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, Any
 from contextvars import ContextVar
 from util.constants import Constants
 from enum import Enum
@@ -178,6 +178,13 @@ class PatchPlan(BaseModel):
     '''
     batches: list[PatchingBatch]
 
+class PatchRequest(BaseModel): 
+    '''
+    Represents the patching request to be sent to github for patching a repo.
+    '''
+    repo: Repo
+    patch_plan: PatchPlan
+
 class PatchetState(BaseModel): 
     '''
     Overall global state available to all the agents. To be used to pass application wide messages.
@@ -193,6 +200,7 @@ class PatchetState(BaseModel):
     vuln_analysis: list[PackageUpgrade] | None = None
     patch_plan: PatchPlan | None = None
     patch_results: dict = {}
+    tool_outputs: dict[str, Any] = {}
     
     def default_exclusion_list(self): 
         return ["messages", "input", "file_tree", "vulns", "vuln_analysis", "patch_plan", "patch_results"]

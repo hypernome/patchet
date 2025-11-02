@@ -6,10 +6,51 @@ from contextlib import asynccontextmanager
 from clientshim.env import EnvParams
 from clientshim.secure_model import AgentSpec, AgentIdentity, VerificationStatus, WorkflowStepStatus, TokenResponse
 from intentmodel.intent_model import AgentComponents, Tool
-from typing import Dict, Any, Optional, List, Callable, AsyncGenerator
-from util.commons import compute_agent_checksum
+from typing import Dict, Any, Optional, List, Callable, AsyncGenerator, DefaultDict
+from util.commons import compute_agent_checksum, to_agent_components_1, to_agent_components, _TOOLS_WITH_DEEP_CHECKSUM
+from util.cryptography import AgentKeyManager
+from util.environment import is_intent_mode_on
 from model.config import AuthProfileName, AuthProfile, token_profiles
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 from enum import Enum
+from agent.graph import ReActAgent, ToolSpec
+from langchain.tools import StructuredTool, Tool as LangChainTool
+from contextvars import ContextVar
+import json, base64, gc
+
+_TOOL_REGISTRY: Dict[str, callable] = {}
+
+class ChecksumLevel(Enum): 
+    deep = "deep", 
+    shallow = "shallow"
+
+def secure_tool(name: str = None, checksum_level: ChecksumLevel = ChecksumLevel.shallow): 
+    """
+    Defines the decorator for creating a secure tool for agents.
+    """
+    def register_func_as_tool(func): 
+        key = name if name else func.__name__
+        _TOOL_REGISTRY[key] = func
+        if checksum_level == ChecksumLevel.deep:
+            _TOOLS_WITH_DEEP_CHECKSUM[key] = func
+        return func 
+    
+    return register_func_as_tool
+
+def register_tool(spec: ToolSpec): 
+    _TOOL_REGISTRY[spec.name] = spec.original_func
+
+def register_as_tool(tool_name: str, tool_func: callable): 
+    _TOOL_REGISTRY[tool_name] = tool_func
+
+def register_tools(specs: list[ToolSpec]): 
+    for spec in specs: 
+        register_tool(spec)
+
+def tool_from_registry(tool_name: str): 
+    return _TOOL_REGISTRY.get(tool_name)
 
 class AuthMode(Enum): 
     """
@@ -29,6 +70,9 @@ class ConfigurationError(Exception):
     """Configuration-related errors"""
     pass
 
+_current_agent_context: ContextVar[str] = ContextVar('current_agent_id', default=None)
+
+_workflow_state_context: ContextVar[dict] = ContextVar('workflow_state', default=None)
 
 class SecureClient: 
     """
@@ -54,11 +98,16 @@ class SecureClient:
         
         # Bridge identifier to verified agent identity mapping
         self.bridge_to_agent: Dict[Any, AgentIdentity] = {}
+        self.tool_to_agent: Dict[Callable, list[AgentIdentity]] = DefaultDict(list)
         
         # Verification tracking
         self.registered_checksums: Dict[str, str] = {}  # checksum -> agent_id
         self.registered_agent_ids: set = set()
         self.verification_status: Dict[str, VerificationStatus] = {}
+        self.verified_agents: Dict[str, Any] = {}
+        
+        # Key management
+        self.agent_key_manager = AgentKeyManager()
         
         # Token caching
         self._token_cache: Dict[str, Dict] = {}
@@ -67,10 +116,43 @@ class SecureClient:
         # HTTP client configuration
         self._http_client: Optional[httpx.AsyncClient] = None
         
-        # Workflow state tracking
-        self._workflow_state = threading.local()
-        
         logger.info(f"SecureClient initialized for app_id={app_id}")
+    
+    def start_workflow_execution(self, workflow_id: str) -> str:
+        """
+        Start a new workflow execution with fresh state.
+        Call this at the beginning of each workflow run.
+        """
+        execution_id = f"exec_{uuid.uuid4().hex[:8]}"
+        
+        _workflow_state_context.set({
+            "execution_id": execution_id,
+            "workflow_id": workflow_id,
+            "completed_steps": [],
+            "failed_steps": [],
+            "history": [],
+            "active_step": None,
+            "started_at": time.time()
+        })
+        
+        logger.info(f"New workflow execution: {execution_id} ({workflow_id})")
+        return execution_id
+    
+    def end_workflow_execution(self, workflow_id: str):
+        """
+        Clean up workflow state after execution.
+        """
+        _workflow_state_context.set(None)
+        logger.info(f"Cleaned up workflow: {workflow_id}")
+    
+    async def restart(self): 
+        await self._register_agents_from_idp()
+    
+    def get_agent(self, agent_id: str) -> ReActAgent:
+        """
+        Get the named registered ReActAgent.
+        """
+        return self.verified_agents.get(agent_id, None)
     
     async def _ensure_http_client(self):
         """Ensure HTTP client is initialized"""
@@ -189,6 +271,9 @@ class SecureClient:
         """
         if asyncio.iscoroutinefunction(original_func): 
             async def async_tool_wrapper(*args, **kwargs): 
+                # Set identity of calling agent via contextvar.
+                _current_agent_context.set(agent_id)
+                
                 # Record workflow step before tool invocation.
                 self._record_tool_invocation(agent_id, tool_name, WorkflowStepStatus.STARTED)
                 
@@ -206,6 +291,7 @@ class SecureClient:
             return async_tool_wrapper
         else: 
             def sync_tool_wrapper(*args, **kwargs): 
+                                
                 # Record workflow step before tool invocation.
                 self._record_tool_invocation(agent_id, tool_name, WorkflowStepStatus.STARTED)
                 
@@ -242,7 +328,7 @@ class SecureClient:
     async def _register_agents_on_client(self, agent_specs: List[AgentSpec]): 
         logger.info(f"Starting verification and registration {len(agent_specs)} agents")
         if not agent_specs: 
-            logger.info(f"There are not agents to register.")
+            logger.info(f"There are no agents to register.")
             return
         
         # As a first step, fetch ground truth from IDP
@@ -250,14 +336,14 @@ class SecureClient:
             idp_registered_agents: Dict[str, Dict] = await self._fetch_idp_registered_agents()
         except Exception as e:
             logger.error(f"Failed to fetch IDP registered agents: {e}")
-            raise
+            return
         
         # Verify that the agents provided for client registration conform with IDP.
         verification_results = []
         for agent_spec in agent_specs: 
             try: 
                 self._verify_single_agent(agent_spec, idp_registered_agents)
-                verification_results.append(agent_spec.agent_id, VerificationStatus.VERIFIED)
+                verification_results.append((agent_spec.agent_id, VerificationStatus.VERIFIED))
                 logger.info(f"Agent '{agent_spec.agent_id}' verified successfully")
             except Exception as e: 
                 verification_results.append((agent_spec.agent_id, VerificationStatus.FAILED))
@@ -269,6 +355,180 @@ class SecureClient:
             self.verification_status[agent_id] = status
         
         logger.info("All agents verified and registered successfully")
+    
+    async def _register_agents_from_idp(self, agent_factory_function: Callable[[str, str, list[LangChainTool]], Any] | None = None): 
+        # As a first step, fetch ground truth from IDP
+        try:
+            agent_registrations: Dict[str, Dict] = await self._fetch_idp_registered_agents()
+        except Exception as e:
+            logger.error(f"Failed to fetch IDP registered agents: {e}")
+            return
+        
+        # Verify that the agents provided for client registration conform with IDP.
+        no_agents_as_tools: list[Dict] = [a for a in agent_registrations.values() if not self._contains_agents_as_tools(a)]
+        agents_as_tools: list[Dict] = [a for a in agent_registrations.values() if self._contains_agents_as_tools(a)]
+        
+        for ar in no_agents_as_tools: 
+            self._prepare_agent(agent_registration=ar)
+        
+        for ar in agents_as_tools: 
+            self._prepare_agent(agent_registration=ar)
+        
+        logger.info("All agents verified and registered successfully")
+        
+    def _contains_agents_as_tools(self, agent_registration: Dict) -> bool: 
+        """
+        Finds of the provided agent_registration has other agents registered as tools.
+        """
+        tools: list[Dict] = agent_registration.get('tools', [])
+        
+        for tool in tools:
+            is_tool_an_agent: bool = bool(tool['is_agent'])
+            if is_tool_an_agent: 
+                return True
+        
+        return False
+        
+    def _prepare_agent(
+        self, 
+        agent_registration: Dict, 
+        agents_as_tools: bool = False,
+        agent_factory_function: Callable[[str, str, list[ToolSpec]], Any] | None = None): 
+        """
+        Verify the IDP registered agent and convert this registration into an 
+        initialized agent.
+        """
+        agent_id: str = agent_registration.get('agent_id', None)
+        
+        if not agent_id: 
+            raise SecurityError(f"Agent not properly registered with IDP")
+
+        if agent_id in self.verified_agents: 
+            raise SecurityError(f"Duplicate agent_id in registration: {agent_id}")
+        
+        tools: list[Dict] = agent_registration.get('tools', [])
+        if not tools: 
+            raise SecurityError(f"Agent {agent_id} did not register any tools.")
+        
+        def to_tool_spec(tool: Dict) -> ToolSpec: 
+            tool_name: str = tool.get('name', None)
+            tool_description: str = tool.get('description', None)
+            is_tool_an_agent: bool = bool(tool['is_agent'])
+            
+            if not tool_name or tool_name not in _TOOL_REGISTRY: 
+                if not is_tool_an_agent:
+                    raise ValueError(
+                        f"Tool {tool_name} not found."
+                        f"Please make sure @secure_tool decorator is added on the tool function."
+                    )
+                if tool_name: 
+                    tool_as_agent: ReActAgent = self.verified_agents[tool_name]
+                    if tool_as_agent:
+                        _TOOL_REGISTRY[tool_name] = tool_as_agent.ainvoke
+            
+            tool_func = _TOOL_REGISTRY.get(tool_name, None)
+            if not tool_func: 
+                raise SecurityError(f"Tool function not found in registry.")
+
+            wrapper_func = self._create_workflow_tracking_wrapper(
+                original_func=tool_func, 
+                agent_id=agent_id, 
+                tool_name=tool_name
+            )
+            
+            tool_spec_from_idp: ToolSpec =  ToolSpec(
+                tool_func, 
+                wrapper_func, 
+                name=tool_name, 
+                description=tool_description,
+                is_agent=bool(tool['is_agent'])
+            )
+            
+            return tool_spec_from_idp        
+          
+        tool_specs: list[ToolSpec] = [to_tool_spec(tool) for tool in tools]
+        
+        agent_prompt = agent_registration.get('prompt', '')
+        
+        agent: ReActAgent = agent_factory_function(agent_id, agent_prompt, tool_specs) if agent_factory_function else ReActAgent(            
+            id=agent_id, 
+            prompt=agent_prompt, 
+            tool_specs=tool_specs, 
+            limit=10
+        ).build(
+            name=agent_id, 
+            recompile=True
+        )
+        
+        # compute checksum
+        agent_components = to_agent_components(agent)
+        computed_checksum: str = compute_agent_checksum(agent_components=agent_components)
+        
+        # get expected checksum
+        expected_checksum: str = agent_registration.get('checksum', None)
+        
+        if not expected_checksum:
+            raise SecurityError(f"No checksum found for agent '{agent_id}' in IDP")
+        
+        # Verify checksums match
+        if computed_checksum != expected_checksum:
+            raise SecurityError(
+                f"Agent '{agent_id}' checksum mismatch. "
+                f"Expected: {expected_checksum[:16]}..., "
+                f"Got: {computed_checksum[:16]}..."
+            )
+        
+        # Check for checksum collisions
+        if computed_checksum in self.registered_checksums:
+            existing_agent = self.registered_checksums[computed_checksum]
+            raise SecurityError(
+                f"Checksum collision: agent '{agent_id}' has same checksum as '{existing_agent}'"
+            )
+        
+        public_key_from_idp: str = agent_registration.get('public_key', None)
+            
+        # Check the existence of valid pop private key for this agent.
+        agent_keys = self.agent_key_manager.agent_keys
+        if agent_keys: 
+            current_agent_private_key: RSAPrivateKey = agent_keys[agent_id]['private_key']
+            if current_agent_private_key: 
+                public_key: RSAPublicKey = current_agent_private_key.public_key()
+                public_pem = public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                public_key_pem: str = public_pem.decode('utf-8')
+                if public_key_from_idp != public_key_pem: 
+                    raise SecurityError(
+                        f"Pop private key error: agent '{agent_id}' was registered with a different PoP key."
+                    )
+        
+        # Create verified agent identity
+        agent_identity = AgentIdentity(
+            agent_id=agent_id,
+            checksum=computed_checksum,
+            registration_id=agent_registration.get("registration_id", ""),
+            prompt=agent_registration.get("prompt", ""),
+            tools=agent_registration.get("tools", ""),
+            wrapped_tools=[tool_spec.func for tool_spec in agent.tool_specs],
+            configuration=agent_components.configuration,
+            registered_at=time.time(),
+            private_key=current_agent_private_key
+        )
+        
+        # Store verified mapping using agent class as bridge identifier
+        bridge_identifier = agent.__class__
+        self.bridge_to_agent[bridge_identifier] = agent_identity
+        
+        
+        for ts in agent.tool_specs:
+            self.tool_to_agent[ts.original_func].append(agent_identity)
+        self.registered_checksums[computed_checksum] = agent_id
+        self.registered_agent_ids.add(agent_id)
+        
+        logger.debug(f"Agent '{agent_id}' registered with bridge: {bridge_identifier}")
+        
+        self.verified_agents[agent_id] = agent
         
     def _verify_single_agent(
         self, 
@@ -295,17 +555,7 @@ class SecureClient:
         
         # Extract and compute checksum
         
-        agent_components: AgentComponents = AgentComponents(
-            agent_spec.agent_id, 
-            prompt_template=agent_spec.prompt, 
-            tools=[
-                Tool(
-                    tool.__name__, 
-                    str(inspect.signature(tool)), 
-                    tool.__doc__) 
-                for tool in agent_spec.tools], 
-            configuration=agent_spec.configuration            
-        )
+        agent_components: AgentComponents = to_agent_components_1(agent_spec)
         
         computed_checksum = compute_agent_checksum(agent_components)
         
@@ -314,6 +564,7 @@ class SecureClient:
         # Get expected checksum from IDP
         idp_agent_data = idp_registered_agents[agent_spec.agent_id]
         expected_checksum = idp_agent_data.get("checksum")
+        public_key_from_idp: str = idp_agent_data.get('public_key')
         
         if not expected_checksum:
             raise SecurityError(f"No checksum found for agent '{agent_spec.agent_id}' in IDP")
@@ -332,6 +583,22 @@ class SecureClient:
             raise SecurityError(
                 f"Checksum collision: agent '{agent_spec.agent_id}' has same checksum as '{existing_agent}'"
             )
+            
+        # Check the existence of valid pop private key for this agent.
+        agent_keys = self.agent_key_manager.agent_keys
+        if agent_keys: 
+            current_agent_private_key: RSAPrivateKey = agent_keys[agent_spec.agent_id]['private_key']
+            if current_agent_private_key: 
+                public_key: RSAPublicKey = current_agent_private_key.public_key()
+                public_pem = public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                public_key_pem: str = public_pem.decode('utf-8')
+                if public_key_from_idp != public_key_pem: 
+                    raise SecurityError(
+                        f"Pop private key error: agent '{agent_spec.agent_id}' was registered with a different PoP key."
+                    )
         
         # Create verified agent identity
         agent_identity = AgentIdentity(
@@ -342,12 +609,17 @@ class SecureClient:
             tools=idp_agent_data.get("tools", ""),
             wrapped_tools=wrapped_tools,
             configuration=agent_components.configuration,
-            registered_at=time.time()
+            registered_at=time.time(),
+            private_key=current_agent_private_key
         )
         
         # Store verified mapping using agent class as bridge identifier
         bridge_identifier = agent_spec.agent_bridge if isinstance(agent_spec.agent_bridge, Callable) else agent_spec.agent_bridge.__class__
         self.bridge_to_agent[bridge_identifier] = agent_identity
+        
+        
+        for t in agent_spec.tools:
+            self.tool_to_agent[t].append(agent_identity)
         self.registered_checksums[computed_checksum] = agent_spec.agent_id
         self.registered_agent_ids.add(agent_spec.agent_id)
         
@@ -363,14 +635,19 @@ class SecureClient:
         await self._ensure_http_client()
         
         try:
-            response = await self._http_client.get(
-                f"{self.idp_url}/agents/{self.app_id}",
-                headers={"Content-Type": "application/json"}
-            )
-            response.raise_for_status()
+            async with self.authenticated_request(
+                "read:agents", 
+                audience="idp.localhost", 
+                auth_profile_name=AuthProfileName.patchet, 
+                mode=AuthMode.oauth
+            ) as client: 
+                response = await client.get(
+                    f"{self.idp_url}/intent/agents/{self.app_id}"
+                )
+                response.raise_for_status()
             
             agents_by_app: Dict[str, List[Dict]] = response.json()
-            registered_agents: List[Dict] = agents_by_app[self.app_id]
+            registered_agents: List[Dict] = agents_by_app[self.app_id] if agents_by_app else []
             agents_by_agent_id: Dict[str, Dict] = {}
             for agent in registered_agents: 
                 agents_by_agent_id[agent['agent_id']] = agent            
@@ -398,31 +675,86 @@ class SecureClient:
             SecurityError: If no registered agent found in execution context
         """
         # Walk up the call stack to find registered agent
-        for frame_info in inspect.stack():
+        
+        for frame_info in inspect.stack(): 
+            function_name = frame_info.function
             frame = frame_info.frame
             
-            # Look for agent instance in local variables
+            print(function_name)
+            
+            func = None
+            
             if 'self' in frame.f_locals:
                 obj = frame.f_locals['self']
                 bridge_identifier = obj.__class__
-                
-                # Check if this class is registered
+            
                 if bridge_identifier in self.bridge_to_agent:
                     agent_identity = self.bridge_to_agent[bridge_identifier]
-                    logger.debug(f"Detected agent context: {agent_identity.agent_id}")
+                    logger.debug(f"Detected agent context via bridge identifier: {agent_identity.agent_id}")
                     return agent_identity
+            
+            if func is None and function_name in frame.f_globals:
+                potential_func = frame.f_globals[function_name]
+                if callable(potential_func): 
+                    func = potential_func
+            
+            if func is None and function_name in frame.f_locals:
+                potential_func = frame.f_locals[function_name]
+                if callable(potential_func): 
+                    func = potential_func
+            
+            agent_identity: AgentIdentity = None
+            if func is not None and func in self.tool_to_agent: 
+                agent_identities = self.tool_to_agent[func]
+                running_agent_instances: list[ReActAgent] = self._find_react_agent_instances([func])
+                if running_agent_instances:
+                    running_agent_id: str = _current_agent_context.get()
+                    for i in running_agent_instances:
+                        agent_comps: AgentComponents = to_agent_components(i)
+                        runtime_checksum: str = compute_agent_checksum(agent_components=agent_comps)
+                        if runtime_checksum not in [a_id.checksum for a_id in agent_identities]: 
+                            raise SecurityError(
+                                "Application attempted to run an unregistered agent. "
+                                "Ensure agent is properly registered and executing within agent method."
+                            ) 
+                        agent_identity = next(
+                            (a_id for a_id in agent_identities 
+                             if runtime_checksum == a_id.checksum and running_agent_id == a_id.agent_id), 
+                            None
+                        )
+                        if agent_identity:
+                            logger.debug(f"Detected agent context via function name: {agent_identity.agent_id}")
+                            return agent_identity
+                    raise SecurityError("The currently running agent could not be verified with any of the registered agents.")
         
         # No registered agent found in call stack
         raise SecurityError(
             "No registered agent found in execution context. "
             "Ensure agent is properly registered and executing within agent method."
         )
+        
+    def _find_react_agent_instances(self, containing_tools: list[Callable] = None) -> list[ReActAgent]:
+        """
+        This function attempts to find all the ReActAgent instances currently in memory.
+        """
+        try: 
+            agents: list[ReActAgent] = [obj for obj in gc.get_objects() if isinstance(obj, ReActAgent)]
+            if containing_tools:
+                # return [agent for agent in agents if any(func in [tool.func for tool in agent.tools_by_name.values()] for func in containing_tools)]
+                return [agent for agent in agents if any(func in [ts.original_func for ts in agent.real_tool_specs()] for func in containing_tools)]
+            return agents
+        except Exception as e: 
+            return [
+                obj for obj in gc.get_objects() 
+                if hasattr(obj, '__class__') and obj.__class__.__name__ == 'ReActAgent'
+            ]
+        
     
     def _get_cache_key(self, *key_components) -> str:
         """
         Generate cache key for token caching
         """
-        return "|".join(key_components)
+        return "|".join(item for item in key_components if item)
     
     def _is_token_valid(self, cached_token: Dict) -> bool:
         """Check if cached token is still valid"""
@@ -432,8 +764,9 @@ class SecureClient:
     async def _mint_intent_token(self, 
                                 workflow_id: str,
                                 agent_identity: AgentIdentity,
-                                *scopes: List[str], 
-                                audience: str) -> TokenResponse:
+                                scopes, 
+                                audience: str, 
+                                workflow_enabled: bool = True) -> TokenResponse:
         """
         Request intent token from IDP using agent checksum grant.
         
@@ -462,18 +795,24 @@ class SecureClient:
             "computed_checksum": agent_identity.checksum,
             "workflow_id": workflow_id,
             "workflow_step": self.workflow_state.get('active_step', {}),
-            "requested_scopes": scopes,
+            "requested_scopes": [scope for scope in scopes],
             "audience": audience,
-            "delegation_context": delegation_context
+            "delegation_context": delegation_context, 
+            "workflow_enabled": workflow_enabled
         }
         
         try:
-            response = await self._http_client.post(
-                f"{self.idp_url}/oauth/token",
-                json=token_request,
-                headers={"Content-Type": "application/json"}
-            )
-            response.raise_for_status()
+            async with self.authenticated_request(
+                "generate:intent-token", 
+                audience="idp.localhost", 
+                auth_profile_name=AuthProfileName.patchet, 
+                mode=AuthMode.oauth
+            ) as client: 
+                response = await client.post(
+                    url=f"{self.idp_url}/intent/token", 
+                    json=token_request
+                )
+                response.raise_for_status()
             
             token_data = response.json()
             
@@ -496,8 +835,10 @@ class SecureClient:
         *scopes,
         audience: str = None, 
         workflow_id: str = None,
-        auth_profile_nane: AuthProfileName = None,
+        auth_profile_name: AuthProfileName = None,
         mode: AuthMode = AuthMode.intent,
+        workflow_enabled: bool = True, 
+        pop_data: Dict[str, Any] = {}
     ) -> AsyncGenerator[httpx.AsyncClient, None]:
         """
         Context manager for authenticated HTTP requests.
@@ -529,7 +870,7 @@ class SecureClient:
                     cached_token = None
             
             if not cached_token: 
-                token_response: TokenResponse = await self._mint_intent_token(agent_identity, workflow_id, scopes, audience) if mode == AuthMode.intent else await self._mint_oauth_token(auth_profile_nane, scopes, audience)
+                token_response: TokenResponse = await self._mint_intent_token(workflow_id, agent_identity, scopes, audience=audience, workflow_enabled=workflow_enabled) if mode == AuthMode.intent else await self._mint_oauth_token(auth_profile_name, scopes, audience)
                 access_token = token_response.access_token
                 
                 # Cache the token
@@ -542,12 +883,28 @@ class SecureClient:
                 
                 logger.debug(f"Minted fresh token for {agent_identity.agent_id if mode == AuthMode.intent else self.app_id}")
             
+            
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
                 "User-Agent": f"SecureClient/{self.app_id}"
             }
             
+            if pop_data and is_intent_mode_on(): 
+                pop_timestamp = int(time.time())
+                pop_payload = dict(**pop_data)
+                pop_payload['checksum'] = agent_identity.checksum
+                pop_payload['timestamp'] = pop_timestamp
+                pop_message = json.dumps(pop_payload, sort_keys=True).encode()
+                pop_signature = agent_identity.private_key.sign(
+                    pop_message, 
+                    padding=padding.PKCS1v15(), 
+                    algorithm=hashes.SHA256()
+                )
+                pop_proof = base64.b64encode(pop_signature).decode()
+                headers["PoP"] = pop_proof
+                headers["X-PoP-Timestamp"] = str(pop_timestamp)
+                
             # Create a new client with authentication headers
             async with httpx.AsyncClient(
                 headers=headers,
@@ -600,10 +957,13 @@ class SecureClient:
     @property
     def workflow_state(self):
         """
-        Get thread-local workflow state
+        Get workflow state from contextvar.
         """
-        if not hasattr(self._workflow_state, 'data'):
-            self._workflow_state.data = {
+        
+        state = _workflow_state_context.get()
+        
+        if state is None:
+            state = {
                 "execution_id": f"exec_{uuid.uuid4().hex[:8]}",
                 "completed_steps": [],
                 "failed_steps": [],
@@ -611,14 +971,15 @@ class SecureClient:
                 "active_step": None,
                 "started_at": time.time()
             }
-        return self._workflow_state.data
+            _workflow_state_context.set(state)
+        return state
     
     @workflow_state.setter
     def workflow_state(self, value):
         """
-        Set thread-local workflow state
+        Set contextvar workflow state
         """
-        self._workflow_state.data = value
+        _workflow_state_context.set(value)
 
 def _secure_factory(): 
     """
@@ -643,8 +1004,10 @@ def _secure_factory():
                 agent_specs=agent_specs
             )
         
+        await _secure_client._register_agents_from_idp()
         if agent_specs:                
-            await _secure_client._register_agents_on_client(agent_specs)
+            # await _secure_client._register_agents_on_client(agent_specs)
+            pass
     
     def get_secure_client() -> SecureClient: 
         if not _secure_client: 

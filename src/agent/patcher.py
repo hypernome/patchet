@@ -1,33 +1,50 @@
-from state.state import PatchetState, PatchPlan, PatchResult, PatchStatus, CURRENT_STATE
+from state.state import Repo, RepoEvent, PatchetState, PatchPlan, PatchRequest, PatchResult, PatchStatus, CURRENT_STATE
 from util.constants import Constants
 from langsmith import traceable
 from langchain.tools import StructuredTool
-from agent.graph import ReActAgent, BootstrapTool
+from agent.graph import ReActAgent, BootstrapTool, ToolSpec
 from clientshim.secure_model import AgentSpec
 from intentmodel.intent_model import AgentComponents, Tool
-import inspect
+from clientshim.secure_client import get_secure_client, AuthMode, secure_tool
+from model.config import AuthProfileName
+from util.tracing import TraceableClient
+from util.environment import EnvVars, is_intent_mode_on
+import inspect, os
+
+api_url: str = os.getenv(EnvVars.API_URL.value)
 
 @traceable
-def bump_versions(): 
+@secure_tool()
+async def bump_versions(): 
     '''
     Applies the patch based on the PatchPlan.
     '''
     state: PatchetState = CURRENT_STATE.get(Constants.CURRENT_STATE.value)
+    repo_event: RepoEvent = state.trigger.change_event
     patch_plan: PatchPlan = state.patch_plan
     patch_results = {}
-    if patch_plan: 
-        for b in patch_plan.batches: 
-            pr = PatchResult(
-                batch_name=b.name, 
-                target_manifest=b.target_manifest, 
-                status=PatchStatus.SUCCESS
-            ).model_dump()            
-            patch_results[b.name] = pr
+    
+    patching_uri: str = Constants.PATCHING_URI.value
+    async with get_secure_client().authenticated_request(
+        "patch", 
+        audience="api.localhost.github", 
+        auth_profile_name=AuthProfileName.patcher, 
+        mode=AuthMode.intent if is_intent_mode_on() else AuthMode.oauth
+        ) as http_client:
+        async with TraceableClient(http_client) as client: 
+            patch_request: PatchRequest = PatchRequest(
+                repo=repo_event.repo, 
+                patch_plan=patch_plan
+            )
+            response = await client.post(url=f"{api_url}{patching_uri}", json=patch_request.model_dump())
+            response.raise_for_status()
+            patch_results = response.json()
     
     return {
         "patch_results": patch_results
     }
-
+    
+@secure_tool()
 def regenerate_sbom():
     '''
     Regenerates the final sbom after all the patching is completed.
@@ -99,12 +116,11 @@ class Patcher:
     
     def __init__(self):
         self.name = "Patcher"
-        self.patcher_tools = [
-            StructuredTool.from_function(regenerate_sbom)
-        ]
+        self.tool_funcs = [bump_versions, regenerate_sbom]
         self.agent_graph = ReActAgent(
-            self.patcher_prompt, 
-            self.patcher_tools, 
+            id=self.name,
+            prompt=self.patcher_prompt, 
+            tool_specs=[ToolSpec(func) for func in self.tool_funcs], 
             limit=10, 
             bootstrap_tool=BootstrapTool(StructuredTool.from_function(bump_versions), {})
         )
@@ -118,7 +134,10 @@ class Patcher:
             agent_id=self.name, 
             agent_bridge=Patcher, 
             prompt=self.agent_graph.prompt, 
-            tools=[tool.func for tool in self.agent_graph.tools_by_name.values()]
+            tools=[tool.func for tool in self.agent_graph.tools_by_name.values()], 
+            tools_map={f"{toolname}_ainvoke" if tool.func.__qualname__ == ReActAgent.ainvoke.__qualname__ else toolname: tool.func 
+                    for toolname, tool in self.agent_graph.tools_by_name.items()
+                }
         )
     
     def agent_components(self): 
@@ -126,8 +145,8 @@ class Patcher:
             agent_id=self.name, 
             prompt_template=self.agent_graph.prompt, 
             tools=[Tool(
-                name=tool.func.__name__, 
-                signature=str(inspect.signature(tool.func)), 
-                description=tool.func.__doc__
-            ) for tool in self.agent_graph.tools_by_name.values()]
+                name=n, 
+                signature=str(inspect.signature(f)), 
+                description=d
+            ) for f, n, d in [(spec.original_func, spec.name, spec.description) for spec in self.agent_graph.real_tool_specs()]]
         )

@@ -32,9 +32,34 @@ class InternalTools:
         '''
         Call this tool when the current state (PatchetState) and/or inputs show that the you cannot proceed further and for now the 
         control should be handed over to the calling Parent workflow.
-        ''' 
+        '''
+
+def internal_tools_funcs(): 
+    """
+    Find a list of all internal tool names.
+    """ 
+    tool_names = []
+    for name, member in inspect.getmembers(InternalTools, inspect.isfunction): 
+        tool_names.append(name)
+    return tool_names
     
-    
+class ToolSpec: 
+    """
+    Specification for providing tools to thiis ReActAgent.
+    """
+    def __init__(
+        self, 
+        original_func: callable,
+        func: callable = None, 
+        name: str | None = None, 
+        description: str | None = None, 
+        is_agent: bool = False
+        ):
+        self.original_func = original_func
+        self.func = func if func else original_func
+        self.name = name
+        self.description = description
+        self.is_agent = is_agent
 
 class Decision(Enum): 
         '''
@@ -43,14 +68,17 @@ class Decision(Enum):
         CONTINUE = "CONTINUE"
         STOP = "STOP"
 
+prompt_tail = "\n\n<CurrentState>\n{current_state}\n</CurrentState>\n\n<StateFlags>\n{state_flags}\n</StateFlags>\n\n{tools_prompt} \n\n<Input>\n{user_input}\n</Input>\n"
+
 class ReActAgent: 
     '''
     Basic langgraph sub-graph based ReAct agent implementation.
     '''
         
     def __init__(self, 
+                 id: str = None,
                  prompt: str = "<Tools>{tools_prompt}</Tools> \n<Input>{input}</Input>", 
-                 tools: list[Tool] = [], 
+                 tool_specs: list[ToolSpec] = [],
                  llm_name: str = "openai:gpt-4.1", 
                  conditionally_continue: Callable[[PatchetState], bool]  = None, 
                  limit: int = -1, 
@@ -59,10 +87,42 @@ class ReActAgent:
                  state_serializer_func: Callable[[PatchetState, list[str]], str] = serialize_state, 
                  bootstrap_tool: BootstrapTool | None = None
                  ):
+        self.id = id
         self.prompt = f"""
-            {prompt if prompt else ""}\n\n<CurrentState>\n{{current_state}}\n</CurrentState>\n\n<StateFlags>\n{{state_flags}}\n</StateFlags>\n\n{{tools_prompt}} \n\n<Input>\n{{user_input}}\n</Input>\n
+            {prompt if prompt else ""}{prompt_tail if not prompt_tail in prompt else ""}
         """
-        tools.extend([StructuredTool.from_function(InternalTools.Yield), StructuredTool.from_function(InternalTools.Done)])
+        tool_specs.extend([ToolSpec(InternalTools.Yield), ToolSpec(InternalTools.Done)])
+        for ts in tool_specs: 
+            if not ts.name: 
+                ts.name = ts.original_func.__name__
+            if not ts.description:
+                ts.description = ts.original_func.__doc__
+
+        self.tool_specs: list[ToolSpec] = tool_specs
+        self.tool_funcs: list[callable] = [tool_spec.func for tool_spec in tool_specs]
+        tools: list[Tool] = []
+        
+        for ts in tool_specs: 
+            # First create with origin function for argument inference for LLM.
+            structured_tool = StructuredTool.from_function(
+                func=ts.original_func, 
+                name=ts.name, 
+                description=ts.description
+            )
+            
+            # Then replace the tool func by wrapper function for workflow tracking.
+            if asyncio.iscoroutinefunction(ts.func):
+                structured_tool.func = None
+                structured_tool.coroutine = ts.func
+            else:
+                structured_tool.func = ts.func
+                structured_tool.coroutine = None
+            
+            if structured_tool.metadata is None: 
+                structured_tool.metadata = {}
+            structured_tool.metadata['is_agent'] = ts.is_agent
+            
+            tools.append(structured_tool)
         
         self.tool_aware_llm = init_chat_model(llm_name, temperature=0.0).bind_tools(tools)        
         self.conditionally_continue = conditionally_continue
@@ -125,7 +185,7 @@ class ReActAgent:
                     args = tool_call["args"]
                     if isinstance(args, str): 
                         args = json.loads(args)
-                    is_tool_an_agent: bool = inspect.ismethod(tool.func) and isinstance(tool.func.__self__, ReActAgent)            
+                    is_tool_an_agent: bool = tool.metadata.get('is_agent', False) or (inspect.ismethod(tool.func) and isinstance(tool.func.__self__, ReActAgent))            
                     parent_messages = state.messages.copy() if is_tool_an_agent else None
                     args = {'state': state.model_dump(exclude=set(['messages']))} if is_tool_an_agent else args
                     token = CURRENT_STATE.set(state)
@@ -194,7 +254,8 @@ class ReActAgent:
         if not name: 
             name = "Anonymous"
         self.name = f"{name}_graph"
-        self.id = uuid.uuid4()
+        if not self.id:
+            self.id = str(uuid.uuid4())
         
         # Add nodes in the graph
         graph.add_node(self.consult_llm.__name__, self.consult_llm)
@@ -248,7 +309,8 @@ class ReActAgent:
             for field in observation: 
                 if field in PatchetState.model_fields: 
                     setattr(state, field, observation[field])
-    
+                else: 
+                    state.tool_outputs[field] = observation[field]
     def optionally_bootstrap(self, state: PatchetState): 
         '''
         If bootstrap tool is provided adjust messages.
@@ -265,7 +327,7 @@ class ReActAgent:
                 }])
             )
     
-    @traceable   
+    @traceable
     async def ainvoke(self, state: PatchetState): 
         '''
         Async invocation for this graph.
@@ -281,6 +343,12 @@ class ReActAgent:
         '''
         if self.agent: 
           return self.agent.invoke(state)
+    
+    def real_tool_specs(self) -> list[ToolSpec]: 
+        """
+        Gets the tool specs for this instance excluding the InternalTools
+        """
+        return [ts for ts in self.tool_specs if ts.name not in internal_tools_funcs()]
 
 class StrcturedAgent: 
     '''

@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from idp.oauth import oauth_router
-from idp.intent import intent_router
+from idp.intent import intent_router, lifespan
 from idp.auth import install_signature_middleware
 
-app = FastAPI(title="Mini IDP (OAuth2 JWT + Intent JWT)", root_path="/idp")
+app = FastAPI(title="Mini IDP (OAuth2 JWT + Intent JWT)", root_path="/idp", lifespan=lifespan)
 
 install_signature_middleware(app)
 

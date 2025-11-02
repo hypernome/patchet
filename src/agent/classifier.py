@@ -1,4 +1,4 @@
-from agent.graph import ReActAgent
+from agent.graph import ReActAgent, ToolSpec
 from state.state import PatchetState, Ecosystem
 from langchain.tools import StructuredTool
 from langsmith import traceable
@@ -7,10 +7,12 @@ from collections import defaultdict
 from state.state import CURRENT_STATE
 from util.constants import Constants
 from clientshim.secure_model import AgentSpec
+from clientshim.secure_client import secure_tool
 from intentmodel.intent_model import AgentComponents, Tool
 import random, yaml, fnmatch, inspect
 
 @traceable
+@secure_tool()
 def search_patterns_in_file_tree(ecosystems: list[Ecosystem]): 
     '''
     This tool looks at each of the provided ecosystems. It takes the list of manifest_globs for each and attempts to find the actual 
@@ -22,12 +24,13 @@ def search_patterns_in_file_tree(ecosystems: list[Ecosystem]):
     for es in ecosystems: 
         if es.manifest_paths: 
             continue
-        es.manifiest_paths = []
+        es.manifest_paths = []
         es.manifest_paths.extend([fnmatch.filter(state.file_tree, pattern) for pattern in es.manifest_globs])
         
     return { "ecosystems": ecosystems }
 
 @traceable
+@secure_tool()
 def transform_identified_ecosystems(ecosystems: dict[str, dict[str, list[str]]]) -> dict[str, list[Ecosystem]]: 
     '''
     This tool is to be called after one or more ecosystems for the given file_tree has already be identified and 
@@ -83,6 +86,7 @@ def transform_identified_ecosystems(ecosystems: dict[str, dict[str, list[str]]])
     }
 
 @traceable
+@secure_tool()
 def retrieve_official_osv_ecosystems(): 
     
     '''
@@ -179,14 +183,15 @@ class Classifier:
     
     def __init__(self):
         self.name = "Classifier"
-        self.classifier_tools = [
-            StructuredTool.from_function(search_patterns_in_file_tree),
-            StructuredTool.from_function(transform_identified_ecosystems), 
-            StructuredTool.from_function(retrieve_official_osv_ecosystems)
+        self.tool_funcs = [
+            search_patterns_in_file_tree,
+            transform_identified_ecosystems, 
+            retrieve_official_osv_ecosystems
         ]
         self.classifier = ReActAgent(
+            id=self.name,
             prompt=self.classifier_prompt, 
-            tools=self.classifier_tools, 
+            tool_specs=[ToolSpec(func) for func in self.tool_funcs],
             conditionally_continue=self.classify, 
             field_exclusion_func=exclude_for_classifier, 
             state_serializer_func=serialize_state_for_classifier
@@ -213,7 +218,10 @@ class Classifier:
             agent_id=self.name, 
             agent_bridge=Classifier, 
             prompt=self.classifier.prompt, 
-            tools=[tool.func for tool in self.classifier.tools_by_name.values()]
+            tools=[tool.func for tool in self.classifier.tools_by_name.values()], 
+            tools_map={f"{toolname}_ainvoke" if tool.func.__qualname__ == ReActAgent.ainvoke.__qualname__ else toolname: tool.func 
+                    for toolname, tool in self.classifier.tools_by_name.items()
+                }
         )
     
     def agent_components(self): 
@@ -221,8 +229,8 @@ class Classifier:
             agent_id=self.name, 
             prompt_template=self.classifier.prompt, 
             tools=[Tool(
-                name=tool.func.__name__, 
-                signature=str(inspect.signature(tool.func)), 
-                description=tool.func.__doc__
-            ) for tool in self.classifier.tools_by_name.values()]
+                name=name, 
+                signature=str(inspect.signature(func)), 
+                description=des
+            ) for func, name, des in [(spec.original_func, spec.name, spec.description) for spec in self.classifier.real_tool_specs()]]
         )      

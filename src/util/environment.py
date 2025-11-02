@@ -1,5 +1,5 @@
 from enum import Enum
-
+import os
 
 class EnvVars(Enum): 
     '''
@@ -14,3 +14,11 @@ class EnvVars(Enum):
     ISSUER='ISSUER'
     APP_ID='APP_ID'
     INTENT_AUTH_MODE='INTENT_AUTH_MODE'
+    API_POP_ENABLED='API_POP_ENABLED'
+
+def is_intent_mode_on() -> bool: 
+    return bool(os.getenv(EnvVars.INTENT_AUTH_MODE.value, "False").lower() == 'true')
+
+def is_pop_enabled() -> bool: 
+    return bool(os.getenv(EnvVars.API_POP_ENABLED.value, "False").lower() == "true")
+

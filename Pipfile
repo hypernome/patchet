@@ -22,6 +22,7 @@ brotli = "*"
 cvss = "*"
 python-jose = "*"
 python-multipart = "*"
+langchain-anthropic = "*"
 
 [dev-packages]
 pytest = "*"
