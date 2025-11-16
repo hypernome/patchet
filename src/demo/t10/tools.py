@@ -124,9 +124,4 @@ async def t10_process_payment(payment_id: str = None, amount: float = None,
     
     except Exception as e:
         print(f"INTENT FORGERY BLOCKED: {e}")
-        
-        return {
-            "attack_succeeded": False,
-            "error": str(e),
-            "payment_id": payment_id
-        }
+        raise e

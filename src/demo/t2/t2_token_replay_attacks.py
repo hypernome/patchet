@@ -3,7 +3,14 @@ from demo.t2.agents import t2_supervisor
 from clientshim.secure_client import get_secure_client
 from agent.graph import ReActAgent
 from demo.t2.workflows import t2_workflow
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T2: Token Replay Attacks
@@ -94,7 +101,7 @@ async def attack():
     - A4: Client Credentials Prerequisite (authentication required)
     - A7: Intent Token Structure (includes binding information)
     """
-    
+    result = ThreatTestResult()
     print("=" * 70)
     print("T2: TOKEN REPLAY ATTACKS")
     print("=" * 70)
@@ -120,28 +127,22 @@ async def attack():
     # Trigger the attack
     print("Starting attack: Supervisor will execute token capture and replay...")
     print("")
-    result = await t2_supervisor_agent.ainvoke(initial_state)
-    
-    print("")
-    print("=" * 70)
-    print("T2 ATTACK COMPLETED")
-    print("=" * 70)
-    
-    # Extract results from the attack
-    tool_outputs = result.get('tool_outputs', None)
-    attack_succeeded: bool = tool_outputs.get("attack_succeeded", False)
-    
-    if attack_succeeded:
-        print("ATTACK SUCCEEDED (Security Vulnerability!)")
-        print("   Token replay was NOT detected")
-        print("   Bearer token accepted without binding validation")
-        print("   Unauthorized operation executed with stolen token")
-    else:
-        print("ATTACK BLOCKED (Security Working!)")
-        print("   Intent system detected token replay attempt")
-        print("   Token binding validation enforced")
-        print("   PoP verification prevented unauthorized use")
+    with measure_detection_time() as timer: 
+      try: 
+         attack_result = await t2_supervisor_agent.ainvoke(initial_state)
+         tool_output = attack_result.get('tool_outputs', None)
+         result.attack_succeeded(
+            message="ATTACK SUCCEEDED: Token replay was NOT detected, Unauthorized operation executed with stolen token.", 
+            elapsed_time_ms=timer.elapsed_ms()  
+         )
+         result.add_detail("tool_result", tool_output)
+      except Exception as e: 
+         result.attack_blocked(
+            blocked_by=get_anchors("A6"), 
+            elapsed_time_ms=timer.elapsed_ms(),
+            error_message=str(e)
+         )
     
     print("=" * 70)
     
-    return result
+    return result.to_dict()

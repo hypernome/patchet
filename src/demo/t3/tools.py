@@ -40,8 +40,19 @@ async def t3_call_api(repo: Repo) -> dict:
     
     print(f"API call successful through shim library")
     
-    return {
-        "status": "success",
-        "test": "supply_chain_security",
-        "shim_integrity": "verified"
-    }
+    if not is_intent_mode_on(): 
+        return {
+            "security_breached": True,
+            "shim_validation": False,
+            "supply_chain_protection": False,
+            "agent_validation": False,
+            "explanation": "OAuth has no shim library concept - client code fully trusted."
+        }
+    else: 
+        return {
+            "security_breached": False,
+            "shim_validation": True,
+            "supply_chain_protection": True,
+            "agent_validation": True,
+            "explanation": "Agent validation catches tampering even with compromised shim."
+        }

@@ -3,7 +3,14 @@ from demo.t8.agents import t8_supervisor
 from clientshim.secure_client import get_secure_client
 from agent.graph import ReActAgent
 from demo.t8.workflows import t8_workflow
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T8: Workflow Step Bypass
@@ -31,7 +38,7 @@ async def attack():
     - Attack attempts: prepare → deploy (skip review)
     - Intent system validates step dependencies
     """
-    
+    result = ThreatTestResult()
     print("="*60)
     print("T8: WORKFLOW STEP BYPASS ATTACK")
     print("="*60)
@@ -45,15 +52,25 @@ async def attack():
     )
     
     # Trigger the attack
-    result = await t8_supervisor_agent.ainvoke(initial_state)
     
-    output = result.get('tool_outputs', {})
-    
+    with measure_detection_time() as timer: 
+      try: 
+        attack_result = await t8_supervisor_agent.ainvoke(initial_state)
+        output = attack_result.get('tool_outputs', {})
+        result.attack_succeeded(
+          message="ATTACK SUCCEEDED: Plain OAuth execution. Agentic workflow attack could not be prevented.", 
+          elapsed_time_ms=timer.elapsed_ms()
+        )
+        result.add_detail("tool_result", output)
+      except Exception as e: 
+        result.attack_blocked(
+          blocked_by=get_anchors("A8", "A10"), 
+          elapsed_time_ms=timer.elapsed_ms(), 
+          error_message=str(e)
+        )
     
     print("="*60)
     print("T8 Attack Completed")
-    print(f"Deployment Status: {output.get('status', 'unknown')}")
-    print(f"Attack Succeeded: {output.get('attack_succeeded', False)}")
     print("="*60)
     
-    return result
+    return result.to_dict()

@@ -4,7 +4,14 @@ from clientshim.secure_client import get_secure_client
 from util.environment import is_intent_mode_on
 from agent.graph import ReActAgent
 from demo.t3.workflows import t3_workflow
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T3: Shim Library Supply Chain Attack
@@ -66,12 +73,6 @@ async def attack():
       - Deploy time: Container image signing
       - Runtime: Immutable containers
     
-    KEY VALIDATIONS TESTED:
-    1. Baseline: Legitimate shim + legitimate agent works
-    2. Defense: Modified agent blocked (checksum mismatch)
-    3. Defense: Unregistered agent blocked (registration required)
-    4. Principle: Agent-level validation = defense-in-depth
-    
     REAL-WORLD ANALOGY:
     Like code signing for applications - even if the signing tool is
     compromised, the signature verification happens independently at
@@ -88,32 +89,15 @@ async def attack():
     - Standard: Build/deploy-time supply chain security (SBOM, signing)
     
     NOTE: This is primarily a conceptual demonstration. The test shows
-    that agent-level validation provides defense-in-depth without requiring
+    that agent-level validation provides in-depth validation without requiring
     actual shim compromise simulation.
     """
-    
+    result = ThreatTestResult()
     print("=" * 70)
     print("T3: SHIM LIBRARY SUPPLY CHAIN ATTACK")
     print("=" * 70)
     print("Threat: Malicious replacement of legitimate shim library")
-    print("Real-World: SolarWinds Orion supply chain attack (2020)")
     print("")
-    
-    if not is_intent_mode_on():
-        print("OAuth Mode:")
-        print("  No shim library concept")
-        print("  No agent validation mechanism")
-        print("  Supply chain compromise = full system compromise")
-        print("")
-        print("  Result: VULNERABLE TO SUPPLY CHAIN ATTACKS")
-        print("         No protection against compromised libraries")
-        print("=" * 70)
-        return {"attack_succeeded": True, "mode": "oauth"}
-    
-    print("Intent System Mode:")
-    print("")
-    print("Scenario 1: Baseline (legitimate shim + legitimate agent)")
-    print("-" * 70)
     
     # Start workflow execution
     secure_client = get_secure_client()
@@ -127,39 +111,31 @@ async def attack():
     # Run baseline test
     print("Executing legitimate agent with official shim...")
     print("")
-    result = await t3_supervisor_agent.ainvoke(initial_state)
+    
+    with measure_detection_time() as timer: 
+      attack_result = await t3_supervisor_agent.ainvoke(initial_state)
+      output = attack_result.get("tool_outputs", {})
+      security_breached: bool = output.get("security_breached", True)
+      
+      result.add_detail("tool_result", output)
+      if security_breached: 
+        result.attack_succeeded(
+          message="OAuth does not support secondary checks and validtions. No Shim library concept.", 
+          elapsed_time_ms=timer.elapsed_ms()
+        )
+      else: 
+        result.attack_blocked(
+          blocked_by=get_anchors("A1", "A2"), 
+          elapsed_time_ms=timer.elapsed_ms(), 
+          error_message="Shim library tampering does not result in unauthorized token use during any Agentic operations."
+        )
+      
     print("  Baseline: Legitimate configuration works")
     print("")
     
     # Conceptual demonstration of defense-in-depth
     print("Scenario 2: Defense Against Compromised Shim")
     print("-" * 70)
-    print("  Conceptual attack simulation:")
-    print("    1. Attacker compromises shim (supply chain attack)")
-    print("    2. Shim modified to skip checksum validation")
-    print("    3. Attacker modifies agent prompt after registration")
-    print("    4. Agent attempts to mint token for API call")
-    print("")
-    print("  Defense-in-depth protection:")
-    print("    Agent Checksum Validation (A1)")
-    print("       • IDP validates checksums independently")
-    print("       • IDP compares: runtime_checksum vs registered_checksum")
-    print("       • Mismatch detected: agent modified since registration")
-    print("    IDP blocks: 'Agent checksum mismatch'")
-    print("")
-    
-    print("Scenario 3: Unregistered Agent Protection")
-    print("-" * 70)
-    print("  Conceptual attack simulation:")
-    print("    1. Attacker creates new malicious agent")
-    print("    2. Compromised shim attempts to mint token")
-    print("    3. Token request: agent_id='MaliciousAgent'")
-    print("")
-    print("  Registration-first protection:")
-    print("    Registration-First Model (A2)")
-    print("       • IDP checks: Is 'MaliciousAgent' registered?")
-    print("       • No registration found in IDP database")
-    print("    IDP blocks: 'Unknown agent - not registered'")
     print("")
     
     # Summary
@@ -172,7 +148,7 @@ async def attack():
     print("  - Deploy time: Container image signing, immutable images")
     print("  - Runtime: Read-only filesystems, process isolation")
     print("")
-    print("Additional Protection (Intent System - Novel):")
+    print("Additional Protection (Intent System):")
     print("  - Agent Checksum Validation (A1)")
     print("     • IDP validates agent integrity independently")
     print("     • Modified agents detected even with compromised shim")
@@ -192,13 +168,4 @@ async def attack():
     print("  agent-level validation that works independently of shim integrity.")
     print("=" * 70)
     
-    return {
-        "attack_succeeded": False,
-        "mode": "intent",
-        "defense_layers": [
-            "Standard supply chain security (signing, SBOM, containers)",
-            "Agent Checksum Validation (A1) - IDP validates independently",
-            "Registration-First Model (A2) - IDP is source of truth"
-        ],
-        "key_protection": "Agent-level validation provides defense-in-depth"
-    }
+    return result.to_dict()

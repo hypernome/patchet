@@ -3,7 +3,14 @@ from demo.t10.agents import t10_supervisor
 from clientshim.secure_client import get_secure_client
 from agent.graph import ReActAgent
 from demo.t10.workflows import t10_workflow
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T10: Intent Origin Forgery
@@ -45,7 +52,7 @@ async def attack():
     - Intent system provides non-repudiable proof of user authorization
     - Delegation chain cryptographically binds actions to original user intent
     """
-    
+    result = ThreatTestResult()
     print("="*60)
     print("T10: INTENT ORIGIN FORGERY ATTACK")
     print("="*60)
@@ -62,14 +69,25 @@ async def attack():
     )
     
     # Trigger the attack
-    result = await t10_supervisor_agent.ainvoke(initial_state)
-    output = result.get('tool_outputs', {})
+    with measure_detection_time() as timer: 
+      
+      try: 
+        attack_result = await t10_supervisor_agent.ainvoke(initial_state)
+        output = attack_result.get('tool_outputs', {})
+        result.attack_succeeded(
+          message="INTENT FORGERY ATTACK SUCCEEDED: OAUTH mode does not support agentic manipulations of original intent.", 
+          elapsed_time_ms=timer.elapsed_ms()
+        )
+        result.add_detail("tool_result", output)
+      except Exception as e: 
+        result.attack_blocked(
+          blocked_by=get_anchors("A9", "A10"), 
+          elapsed_time_ms=timer.elapsed_ms(), 
+          error_message=str(e)
+        )
     
     print("="*60)
     print("T10 Attack Completed")
-    print(f"Attack Succeeded: {output.get('attack_succeeded', False)}")
-    if output.get('amount'):
-        print(f"Unauthorized Payment: ${output['amount']}")
     print("="*60)
     
-    return output
+    return result.to_dict()

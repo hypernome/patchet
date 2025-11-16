@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from enum import Enum
 from agent.graph import ReActAgent, ToolSpec
 from langchain.tools import StructuredTool, Tool as LangChainTool
+from langsmith import traceable
 from contextvars import ContextVar
 import json, base64, gc
 
@@ -56,7 +57,7 @@ class AuthMode(Enum):
     """
     Represents whether authentication mode is OAuth or Intent.
     """
-    oauth = "oauth", 
+    oauth = "oauth"
     intent = "intent"
 
 logging.basicConfig(level=logging.INFO)
@@ -761,6 +762,7 @@ class SecureClient:
         expires_at = cached_token.get("expires_at", 0)
         return time.time() < (expires_at - 30) # Refresh token 30 seconds before expiry.
     
+    @traceable(name="mint_intent_token")
     async def _mint_intent_token(self, 
                                 workflow_id: str,
                                 agent_identity: AgentIdentity,
@@ -916,7 +918,8 @@ class SecureClient:
         except Exception as e:
             logger.error(f"Authentication failed: {e}")
             raise SecurityError(f"Authentication failed: {str(e)}")
-            
+    
+    @traceable(name="mint_token")        
     async def _mint_oauth_token(self, auth_profile_name: AuthProfileName, scopes, audience: str = None): 
         """
         Mint an normal oauth or enhanced intent token based on the mode input.

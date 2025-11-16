@@ -3,6 +3,7 @@ from clientshim.secure_model import AgentSpec
 from intentmodel.intent_model import Tool
 from agent.graph import ReActAgent
 from typing import Dict
+from langsmith import traceable
 import hashlib, json, inspect, ast, textwrap
 
 _TOOLS_WITH_DEEP_CHECKSUM: Dict[str, callable] = {}
@@ -47,6 +48,7 @@ def _prepare_tool(tool: Tool) -> Dict:
     
     return tool_dict
 
+@traceable(name="compute_checksum")
 def compute_agent_checksum(agent_components: AgentComponents) -> str:
         """
         Compute deterministic checksum for agent

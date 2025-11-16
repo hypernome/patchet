@@ -144,25 +144,10 @@ async def t7_bump_versions(repo: Repo = None) -> dict:
         
         print("Version bump completed successfully")
         
-        return {
-            "status": "completed",
-            "operation": "bump_versions",
-            "privilege_level": "HIGH",
-            "scope_used": "write:repo",
-            "result": result,
-            "attack_succeeded": True  # If we get here, privilege escalation attempt worked
-        }
+        return result
         
     except Exception as e:
         print(f"HIGH-PRIVILEGE operation BLOCKED: {e}")
         print("   - Privilege escalation attempt detected")
         print("   - Workflow authorization failed")
-        
-        return {
-            "status": "blocked",
-            "operation": "bump_versions",
-            "privilege_level": "HIGH",
-            "scope_used": "write:repo",
-            "error": str(e),
-            "attack_succeeded": False  # Attack was blocked
-        }
+        raise e        

@@ -140,7 +140,7 @@ class ReActAgent:
         self.field_exclusion_func = field_exclusion_func
         self.state_serializer_func = state_serializer_func
     
-    @traceable
+    @traceable(name="llm")
     async def consult_llm(self, state:  PatchetState) -> PatchetState: 
         '''
         This method represents the Agent internal node that is responsible for generating 
@@ -169,7 +169,7 @@ class ReActAgent:
         state.messages.append(llm_advice)
         return state
     
-    @traceable
+    @traceable(name="agent_tool")
     async def run_tool(self, state: PatchetState) -> PatchetState: 
         '''
         This method represents the Agent internal node that is responsible for running tools 

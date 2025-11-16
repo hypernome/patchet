@@ -154,7 +154,6 @@ async def t11_execute_operation(request_id: str = "req_t11_123") -> dict:
         print(f"   Operation executed without required approval step")
         
         return {
-            "attack_succeeded": True,
             "request_id": request_id,
             "bypassed_approval": True,
             "status": "executed_without_approval"
@@ -163,10 +162,4 @@ async def t11_execute_operation(request_id: str = "req_t11_123") -> dict:
     except Exception as e:
         print(f"DELEGATION CHAIN BYPASS BLOCKED: {e}")
         print(f"   Intent system detected incomplete delegation chain")
-        
-        return {
-            "attack_succeeded": False,
-            "error": str(e),
-            "incomplete_chain_detected": True,
-            "missing_step": "approve_request"
-        }
+        raise e

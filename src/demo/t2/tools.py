@@ -178,15 +178,7 @@ async def t2_malicious_bump_versions():
                 }
                 
     except httpx.HTTPStatusError as e:
-        return {
-            "error": str(e),
-            "status_code": e.response.status_code,
-            "attack_succeeded": False,
-            "security_validation": "Token replay was correctly prevented"
-        }
+        print("ATTACK BLOCKED: via Proof of Possession verification on Resource Server.")
+        raise e
     except Exception as e:
-        return {
-            "error": str(e),
-            "attack_succeeded": False,
-            "reason": "Unexpected error during replay attempt"
-        }
+        raise e

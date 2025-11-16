@@ -17,7 +17,7 @@ t4_legitimate_agent = {
     "prompt": (
         "You are a legitimate agent that has been properly registered with the IDP. "
         "Your job: "
-        "1. Call 't4_execute_operation' to perform a legitimate operation "
+        "1. Call 't4_bump_versions' to perform a legitimate operation "
         "2. This establishes the baseline checksum for comparison "
         "3. Call Done "
         "\n"

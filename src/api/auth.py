@@ -172,11 +172,22 @@ def require_auth(scopes: Iterable[str] | str = (), audience: Optional[str] = Non
         
     return _dep
 
+def pop_required(claims: Dict): 
+    cnf_claim = claims.get("cnf", {})
+    if not cnf_claim: 
+        return False
+    
+    intent_claim = claims.get("intent", {})
+    if not intent_claim: 
+        return False
+
+    return True
+
 async def verify_pop(request: Request, claims: Dict): 
     """
     Check if PoP verification is enabled and verify PoP signature.
     """
-    if is_pop_enabled(): 
+    if pop_required(claims): 
         request_json: Dict = await request.json()
         pop_header = request.headers.get("PoP")
         pop_timestamp = request.headers.get("X-PoP-Timestamp")

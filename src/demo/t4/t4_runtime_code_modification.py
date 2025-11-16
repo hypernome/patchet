@@ -4,9 +4,15 @@ from clientshim.secure_client import get_secure_client
 from agent.graph import ReActAgent, ToolSpec
 from util.reg import register_agents
 from demo.utils import agent
-from demo.t4.tools import t4_malicious_bump_versions
+from demo.t4.tools import t4_bump_versions, t4_malicious_bump_versions
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
-
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T4: Runtime Code Modification
@@ -52,7 +58,7 @@ async def attack():
     - A4: Client Credentials Prerequisite (authentication required)
     - A7: Intent Token Structure (includes checksum binding)
     """
-    
+    result = ThreatTestResult()
     print("=" * 70)
     print("T4: RUNTIME CODE MODIFICATION")
     print("=" * 70)
@@ -71,7 +77,7 @@ async def attack():
     t4_supervisor_agent: ReActAgent = secure_client.get_agent(
         t4_supervisor.get('name', '')
     )
-    result = await t4_supervisor_agent.ainvoke(initial_state)    
+    correct_agent_result = await t4_supervisor_agent.ainvoke(initial_state)    
     
     # Now pick an already registered agent under this Supervisor (The agent registration is an isolated one-time operation not a part of client's runtime)
     t4_agent: ReActAgent = secure_client.get_agent(
@@ -86,28 +92,31 @@ async def attack():
     # Trigger the attack by running the same supervisor (This time it should fail).
     print("Starting attack: Testing runtime integrity validation...")
     print("")
-    result = await t4_supervisor_agent.ainvoke(initial_state)
-    
+    with measure_detection_time() as timer:
+        try:
+            attack_result = await t4_supervisor_agent.ainvoke(initial_state)
+            tool_output = attack_result.get('tool_outputs', None)
+            result.attack_succeeded(
+                message="ATTACK SUCCEEDED: Runtime code modification was NOT detected. Modified implementation executed without validation.", 
+                elapsed_time_ms=timer.elapsed_ms()
+            )
+            result.add_detail("tool_result", tool_output)        
+        except Exception as e: 
+            print(f"Attack execution failed: {e}")
+            result.attack_blocked(
+                blocked_by=get_anchors("A1", "A12"), 
+                elapsed_time_ms=timer.elapsed_ms(), 
+                error_message=str(e)
+            )
+        finally:
+            ts.original_func = t4_bump_versions
+            ts.func = t4_bump_versions
+            
     print("")
     print("=" * 70)
     print("T4 ATTACK COMPLETED")
     print("=" * 70)
     
-    # Extract results from the attack
-    tool_outputs = result.get('tool_outputs', None)
-    attack_succeeded = tool_outputs.get('attack_succeeded', False)
-    
-    if attack_succeeded:
-        print("ATTACK SUCCEEDED (Security Vulnerability!)")
-        print("   - Runtime code modification was NOT detected")
-        print("   - Modified implementation executed without validation")
-        print("   - Agent checksum not recomputed at token request")
-    else:
-        print("ATTACK BLOCKED (Security Working!)")
-        print("   - Runtime code modification detected")
-        print("   - Checksum mismatch identified")
-        print("   - Modified agent prevented from executing")
-    
     print("=" * 70)
     
-    return result
+    return result.to_dict()

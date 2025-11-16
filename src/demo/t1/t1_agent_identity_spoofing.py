@@ -5,8 +5,14 @@ from agent.graph import ReActAgent
 from util.reg import register_agents
 from demo.utils import agent
 from util.environment import is_intent_mode_on
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
-
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T1: Agent Identity Spoofing
@@ -49,21 +55,35 @@ async def attack():
     print("="*60)
     
     # First attempt to register
-    if is_intent_mode_on():
-        try: 
-            await register_agents([agent(a) for a in [t1_planner, t1_impersonator, t1_supervisor]], skip_regsitration_check=True)
-            
-        except Exception as e: 
-            print(f"T1 AGENT IDENTITY SPOOFING BLOCKED: at registration attempt. {e}")
-    else: 
-        # When not in Intent mode, the agents don't need to be registered.
-        unregistered_impersonator: ReActAgent = agent(t1_impersonator)
-        await unregistered_impersonator.ainvoke(initial_state)
-        print(f"T1 AGENT IDENTITY SPOOFING ALLOWED: An unregistered impersonator agent was able to run as a normal.")
-        
+    
+    result = ThreatTestResult()
+    
+    with measure_detection_time() as timer:
+        if is_intent_mode_on():
+            try: 
+                await register_agents([agent(a) for a in [t1_planner, t1_impersonator, t1_supervisor]], skip_regsitration_check=True)
+                result.attack_succeeded(message="An Impersonator Agent was allowed to be registered. This is a most likely a security breach.")
+            except Exception as e: 
+                print(f"T1 AGENT IDENTITY SPOOFING BLOCKED: at registration attempt. {e}")
+                result.attack_blocked(
+                    blocked_by=get_anchors("A2"), 
+                    elapsed_time_ms=timer.elapsed_ms(),
+                    error_message=str(e)
+                )
+        else: 
+            # When not in Intent mode, the agents don't need to be registered.
+            unregistered_impersonator: ReActAgent = agent(t1_impersonator)
+            await unregistered_impersonator.ainvoke(initial_state)
+            print(f"T1 AGENT IDENTITY SPOOFING ALLOWED: An unregistered impersonator agent was able to run as a normal.")
+            result.attack_succeeded(
+                message="An Impersonator Agent was allowed to be registered by plain OAuth. Agent Identity is not supported.", 
+                elapsed_time_ms=timer.elapsed_ms()
+            )
+                    
     print("="*60)
     print("T1 Attack Completed - Check logs for results")
     print("="*60)
     
+    return result.to_dict()
     
     

@@ -4,8 +4,14 @@ from clientshim.secure_client import get_secure_client
 from agent.graph import ReActAgent
 from util.reg import register_agents
 from demo.utils import agent
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
-
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T5: Prompt Injection Attacks
@@ -44,7 +50,7 @@ async def attack():
     - Prompt included in checksum computation
     - Runtime integrity validation
     """
-    
+    result = ThreatTestResult()
     print("=" * 70)
     print("T5: PROMPT INJECTION ATTACKS")
     print("=" * 70)
@@ -61,7 +67,7 @@ async def attack():
     t5_supervisor_agent: ReActAgent = secure_client.get_agent(
         t5_supervisor.get('name', '')
     )
-    result = await t5_supervisor_agent.ainvoke(initial_state)    
+    attack_result = await t5_supervisor_agent.ainvoke(initial_state)    
     
     # Now pick the already registered agent under this Supervisor
     t5_agent: ReActAgent = secure_client.get_agent(
@@ -95,35 +101,33 @@ async def attack():
     print("")
     
     # Modify the agent's prompt at runtime
+    original_prompt: str = t5_agent.prompt
     t5_agent.prompt = malicious_prompt
     
     # Trigger the attack by running the supervisor again (This time it should fail)
     print("Starting attack: Testing prompt injection detection...")
     print("")
-    result = await t5_supervisor_agent.ainvoke(initial_state)
+    
+    with measure_detection_time() as timer: 
+        try:            
+            attack_result = await t5_supervisor_agent.ainvoke(initial_state)
+            tool_output = attack_result.get('tool_outputs', None)
+            result.attack_succeeded(
+                message="ATTACK SUCCEEDED: Prompt injection was NOT detected. Prompt validation not supported.", 
+                elapsed_time_ms=timer.elapsed_ms()
+            )
+            result.add_detail("tool_result", tool_output)
+            t5_agent.prompt = original_prompt
+        except Exception as e: 
+            result.attack_blocked(
+                blocked_by=get_anchors("A12"), 
+                elapsed_time_ms=timer.elapsed_ms(), 
+                error_message=str(e)   
+            )
     
     print("")
     print("=" * 70)
     print("T5 ATTACK COMPLETED")
     print("=" * 70)
     
-    # Extract results from the attack
-    tool_outputs = result.get('tool_outputs', None)
-    attack_succeeded = tool_outputs.get('attack_succeeded', False)
-    
-    if attack_succeeded:
-        print("ATTACK SUCCEEDED (Security Vulnerability!)")
-        print("   - Prompt injection was NOT detected")
-        print("   - Modified prompt executed without validation")
-        print("   - Agent checksum not recomputed at token request")
-        print("   - Jailbroken behavior allowed")
-    else:
-        print("ATTACK BLOCKED (Security Working!)")
-        print("   - Prompt injection detected")
-        print("   - Checksum mismatch identified")
-        print("   - Modified prompt prevented from executing")
-        print("   - Jailbreak attempt blocked")
-    
-    print("=" * 70)
-    
-    return result
+    return result.to_dict()

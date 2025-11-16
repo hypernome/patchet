@@ -96,13 +96,7 @@ async def t5_bump_versions():
                 response.raise_for_status()
                 patch_results = response.json()
         
-        print("PROMPT INJECTION ATTACK SUCCEEDED!")
-        print("   Modified prompt executed without detection")
-        print("   Agent behavior changed via prompt injection")
-        
         return {
-            "success": True,
-            "attack_succeeded": True,
             "prompt_status": "modified",
             "checksum_status": "not_validated",
             "operation_result": patch_results,
@@ -114,12 +108,4 @@ async def t5_bump_versions():
         print("   Modified prompt detected by checksum validation")
         print("   Agent checksum mismatch")
         print("   Security mechanism working correctly")
-        
-        return {
-            "success": False,
-            "attack_succeeded": False,
-            "prompt_status": "modified",
-            "checksum_status": "mismatch_detected",
-            "error": str(e),
-            "security_validation": "Prompt injection detected and blocked"
-        }
+        raise e

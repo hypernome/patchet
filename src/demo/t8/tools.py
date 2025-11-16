@@ -154,10 +154,4 @@ async def t8_deploy_to_production(deployment_id: str, approval_status: str = Non
     
     except Exception as e:
         print(f"Deployment blocked: {e}")
-        
-        return {
-            "deployment_id": deployment_id, 
-            "status": "blocked",
-            "error": str(e),
-            "attack_succeeded": False  # In Intent mode
-        }
+        raise e

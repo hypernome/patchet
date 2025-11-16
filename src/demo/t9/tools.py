@@ -95,9 +95,4 @@ async def t9_write_multiple_files(files: list[dict] = None) -> dict:
     
     except Exception as e:
         print(f"SCOPE INFLATION BLOCKED: {e}")
-        
-        return {
-            "attack_succeeded": False,
-            "error": str(e),
-            "attempted_scope": "write:files:all"
-        }
+        raise e

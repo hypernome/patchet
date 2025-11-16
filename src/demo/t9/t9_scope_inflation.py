@@ -3,7 +3,14 @@ from demo.t9.agents import t9_supervisor
 from clientshim.secure_client import get_secure_client
 from agent.graph import ReActAgent
 from demo.t9.workflows import t9_workflow
+from experiment.threat_test_helper import (
+    ThreatTestResult, 
+    capture_langsmith_trace, 
+    measure_detection_time,
+    get_anchors
+)
 
+@capture_langsmith_trace
 async def attack():
     """
     Run scenario for threat T9: Scope Inflation
@@ -39,7 +46,7 @@ async def attack():
     - Agent registered for narrow-scope step tries to use broad-scope action
     - Intent system enforces: agent can only use scopes from its current step
     """
-    
+    result = ThreatTestResult()
     print("="*60)
     print("T9: SCOPE INFLATION ATTACK")
     print("="*60)
@@ -56,14 +63,24 @@ async def attack():
     )
     
     # Trigger the attack
-    result = await t9_supervisor_agent.ainvoke(initial_state)
-    output = result.get('tool_outputs', {})
+    with measure_detection_time() as timer: 
+      try:
+        attack_result = await t9_supervisor_agent.ainvoke(initial_state)
+        output = attack_result.get('tool_outputs', {})
+        result.attack_succeeded(
+          message="SCOPE INFLATION ATTACK SUCCEEDED: OAuth mode allowed scope inflation by attacking agent.", 
+          elapsed_time_ms=timer.elapsed_ms()
+        )
+        result.add_detail("tool_result", output)
+      except Exception as e: 
+        result.attack_blocked(
+          blocked_by=get_anchors("A7", "A8"), 
+          elapsed_time_ms=timer.elapsed_ms(), 
+          error_message=str(e)
+        )
     
     print("="*60)
-    print("T9 Attack Completed")
-    print(f"Attack Succeeded: {output.get('attack_succeeded', False)}")
-    if result.get('files_written'):
-        print(f"Unauthorized Files Written: {len(output['files_written'])}")
+    print("T9 Attack Completed")    
     print("="*60)
     
-    return output
+    return result.to_dict()

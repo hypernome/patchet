@@ -92,8 +92,6 @@ async def t4_bump_versions():
                 patch_results = response.json()
         
         return {
-            "success": True,
-            "attack_succeeded": True,
             "implementation": "modified",
             "checksum_status": "not_validated",
             "operation_result": patch_results,
@@ -103,16 +101,8 @@ async def t4_bump_versions():
         print(f"RUNTIME MODIFICATION ATTACK BLOCKED: {e}")
         print("   Modified code detected by checksum validation")
         print("   Agent checksum mismatch")
-        print("   Security mechanism working correctly")
-        
-        return {
-            "success": False,
-            "attack_succeeded": False,
-            "implementation": "modified",
-            "checksum_status": "mismatch_detected",
-            "error": str(e),
-            "security_validation": "Runtime modification detected and blocked"
-        }
+        print("   Security mechanism working correctly")        
+        raise e
 
 @secure_tool()
 @traceable
