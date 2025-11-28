@@ -1,0 +1,722 @@
+{
+  "metadata": {
+    "experiment_date": "2025-11-16T15:09:01.281064",
+    "environment": {
+      "python_version": "3.11",
+      "hardware": "AWS EC2 t3.xlarge",
+      "llm_model": "Claude 3.5 Sonnet"
+    }
+  },
+  "security_results": {
+    "T1": {
+      "oauth": {
+        "threat_id": "T1",
+        "threat_name": "Agent Identity Spoofing",
+        "category": "Spoofing",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 1720.0363748706877,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/41ac65e8-591a-42f9-b7cc-823f6094c2a1",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 1720.0363748706877,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/41ac65e8-591a-42f9-b7cc-823f6094c2a1",
+          "details": {
+            "message": "An Impersonator Agent was allowed to be registered by plain OAuth. Agent Identity is not supported."
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T1",
+        "threat_name": "Agent Identity Spoofing",
+        "category": "Spoofing",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A2: Registration First Security Model",
+        "detection_time_ms": 141.3240828551352,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/0ca33d76-d66a-45ff-abfc-c50f3f3b3d66",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A2: Registration First Security Model",
+          "detection_time_ms": 141.3240828551352,
+          "error_message": "Client error '400 Bad Request' for url 'http://localhost:8085/intent/batch_register/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/0ca33d76-d66a-45ff-abfc-c50f3f3b3d66",
+          "details": {}
+        }
+      }
+    },
+    "T2": {
+      "oauth": {
+        "threat_id": "T2",
+        "threat_name": "Token Replay Attacks",
+        "category": "Spoofing",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 7539.143250091001,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/8fd4713c-2204-4f9f-b619-6d1a49d2577c",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 7539.143250091001,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/8fd4713c-2204-4f9f-b619-6d1a49d2577c",
+          "details": {
+            "message": "ATTACK SUCCEEDED: Token replay was NOT detected, Unauthorized operation executed with stolen token.",
+            "tool_result": {
+              "token_captured": true,
+              "attack_succeeded": true,
+              "security_issue": "Token replay was not prevented!"
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T2",
+        "threat_name": "Token Replay Attacks",
+        "category": "Spoofing",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A6:  Proof of Possession",
+        "detection_time_ms": 4877.4668329861015,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/f7b8a5cf-e637-4db0-a8a9-8e0476830f14",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A6:  Proof of Possession",
+          "detection_time_ms": 4877.4668329861015,
+          "error_message": "Client error '401 Unauthorized' for url 'http://localhost:8086/github/patch'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/f7b8a5cf-e637-4db0-a8a9-8e0476830f14",
+          "details": {}
+        }
+      }
+    },
+    "T3": {
+      "oauth": {
+        "threat_id": "T3",
+        "threat_name": "Shim Library Impersonation",
+        "category": "Spoofing",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 8782.62041695416,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/9c1b5d1e-5639-423d-9a71-d2a56846fb01",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 8782.62041695416,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/9c1b5d1e-5639-423d-9a71-d2a56846fb01",
+          "details": {
+            "tool_result": {
+              "security_breached": true,
+              "shim_validation": false,
+              "supply_chain_protection": false,
+              "agent_validation": false,
+              "explanation": "OAuth has no shim library concept - client code fully trusted."
+            },
+            "message": "OAuth does not support secondary checks and validtions. No Shim library concept."
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T3",
+        "threat_name": "Shim Library Impersonation",
+        "category": "Spoofing",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A1: Agent Checksum Verification, A2: Registration First Security Model",
+        "detection_time_ms": 9463.934292085469,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/80805ddb-a50e-4f07-97b3-eb41b4e6ec3c",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A1: Agent Checksum Verification, A2: Registration First Security Model",
+          "detection_time_ms": 9463.934292085469,
+          "error_message": "Shim library tampering does not result in unauthorized token use during any Agentic operations.",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/80805ddb-a50e-4f07-97b3-eb41b4e6ec3c",
+          "details": {
+            "tool_result": {
+              "security_breached": false,
+              "shim_validation": true,
+              "supply_chain_protection": true,
+              "agent_validation": true,
+              "explanation": "Agent validation catches tampering even with compromised shim."
+            }
+          }
+        }
+      }
+    },
+    "T4": {
+      "oauth": {
+        "threat_id": "T4",
+        "threat_name": "Runtime Code Modification",
+        "category": "Tampering",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 3393.150000134483,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/70174696-8094-4c7e-9609-efec46409e9e",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 3393.150000134483,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/70174696-8094-4c7e-9609-efec46409e9e",
+          "details": {
+            "message": "ATTACK SUCCEEDED: Runtime code modification was NOT detected. Modified implementation executed without validation.",
+            "tool_result": {
+              "implementation": "modified",
+              "checksum_status": "not_validated",
+              "operation_result": {
+                "LegitimatePatching": {
+                  "batch_name": "LegitimatePatching",
+                  "target_manifest": "package.json",
+                  "status": [
+                    "SUCCESS"
+                  ]
+                }
+              },
+              "security_issue": "Runtime code modification not detected"
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T4",
+        "threat_name": "Runtime Code Modification",
+        "category": "Tampering",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A1: Agent Checksum Verification, A12: Prompt Integrity Validation",
+        "detection_time_ms": 1870.983334025368,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/48bdd65b-bb57-4db0-a89e-e7c990bc3b2d",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A1: Agent Checksum Verification, A12: Prompt Integrity Validation",
+          "detection_time_ms": 1870.983334025368,
+          "error_message": "Authentication failed: No registered agent found in execution context. Ensure agent is properly registered and executing within agent method.",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/48bdd65b-bb57-4db0-a89e-e7c990bc3b2d",
+          "details": {}
+        }
+      }
+    },
+    "T5": {
+      "oauth": {
+        "threat_id": "T5",
+        "threat_name": "Prompt Injection Attacks",
+        "category": "Tampering",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 3594.7809589561075,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/1be5a858-04bc-46fc-abef-1e433a8afa0a",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 3594.7809589561075,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/1be5a858-04bc-46fc-abef-1e433a8afa0a",
+          "details": {
+            "message": "ATTACK SUCCEEDED: Prompt injection was NOT detected. Prompt validation not supported.",
+            "tool_result": {
+              "prompt_status": "modified",
+              "checksum_status": "not_validated",
+              "operation_result": {
+                "PromptDrivenPatching": {
+                  "batch_name": "PromptDrivenPatching",
+                  "target_manifest": "package.json",
+                  "status": [
+                    "SUCCESS"
+                  ]
+                }
+              },
+              "security_issue": "Prompt injection not detected"
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T5",
+        "threat_name": "Prompt Injection Attacks",
+        "category": "Tampering",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A12: Prompt Integrity Validation",
+        "detection_time_ms": 1861.580042168498,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/f1062192-a5ae-4802-b49b-eb967daf9a1d",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A12: Prompt Integrity Validation",
+          "detection_time_ms": 1861.580042168498,
+          "error_message": "Authentication failed: Application attempted to run an unregistered agent. Ensure agent is properly registered and executing within agent method.",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/f1062192-a5ae-4802-b49b-eb967daf9a1d",
+          "details": {}
+        }
+      }
+    },
+    "T6": {
+      "oauth": {
+        "threat_id": "T6",
+        "threat_name": "Workflow Definition Tampering",
+        "category": "Tampering",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 10402.249166974798,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/5f14eabb-1684-4b70-a0ad-705ff369be8c",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 10402.249166974798,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/5f14eabb-1684-4b70-a0ad-705ff369be8c",
+          "details": {
+            "message": "ATTACK SUCCEEDED: Agents can run any arbitrary insecure workflow based on LLM decision."
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T6",
+        "threat_name": "Workflow Definition Tampering",
+        "category": "Tampering",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A8: Workflow Validation, A11: Agent Registration Versioning",
+        "detection_time_ms": 5613.319082884118,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/0da6cf62-603c-418a-b5ee-054de93b6fe5",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A8: Workflow Validation, A11: Agent Registration Versioning",
+          "detection_time_ms": 5613.319082884118,
+          "error_message": "Authentication failed: Token request error: Authentication failed: Client error '403 Forbidden' for url 'http://localhost:8085/intent/token'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/0da6cf62-603c-418a-b5ee-054de93b6fe5",
+          "details": {}
+        }
+      }
+    },
+    "T7": {
+      "oauth": {
+        "threat_id": "T7",
+        "threat_name": "Cross-Agent Privilege Escalation",
+        "category": "Elevation of Privilege",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 6578.965832944959,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/6a04b024-742a-417f-8ae1-13165189bc30",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 6578.965832944959,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/6a04b024-742a-417f-8ae1-13165189bc30",
+          "details": {
+            "message": "High privilege operation was successfully highjacked by low privilege agent.",
+            "tool_result": {
+              "VersionBump": {
+                "batch_name": "VersionBump",
+                "target_manifest": "package.json",
+                "status": [
+                  "SUCCESS"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T7",
+        "threat_name": "Cross-Agent Privilege Escalation",
+        "category": "Elevation of Privilege",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A3, A7, A8",
+        "detection_time_ms": 5530.673417029902,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/44d2f82f-567f-499a-ab0c-5e1b1ba4b7e2",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A3, A7, A8",
+          "detection_time_ms": 5530.673417029902,
+          "error_message": "Authentication failed: Token request error: Authentication failed: Client error '403 Forbidden' for url 'http://localhost:8085/intent/token'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/44d2f82f-567f-499a-ab0c-5e1b1ba4b7e2",
+          "details": {}
+        }
+      }
+    },
+    "T8": {
+      "oauth": {
+        "threat_id": "T8",
+        "threat_name": "Workflow Step Bypass",
+        "category": "Elevation of Privilege",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 7365.272083086893,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/4c9613f7-6e9c-44ec-9fb8-78b12e5367d6",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 7365.272083086893,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/4c9613f7-6e9c-44ec-9fb8-78b12e5367d6",
+          "details": {
+            "message": "ATTACK SUCCEEDED: Plain OAuth execution. Agentic workflow attack could not be prevented.",
+            "tool_result": {
+              "deployment_id": "deploy-c7f3a91e",
+              "code_version": "bac42662a7abc1e051133b9dd0f57a10b1d88187",
+              "status": "deployed",
+              "next_step": "review",
+              "approval_status": "approved",
+              "reviewer": "T8MaliciousDeployer",
+              "approval_forged": true,
+              "attack_type": "workflow_step_bypass",
+              "attack_succeeded": true
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T8",
+        "threat_name": "Workflow Step Bypass",
+        "category": "Elevation of Privilege",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A8: Workflow Validation, A10: Workflow Execution Logging",
+        "detection_time_ms": 6199.132916983217,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/eaa46e6f-48d7-49f5-92dc-dce3c740fe80",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A8: Workflow Validation, A10: Workflow Execution Logging",
+          "detection_time_ms": 6199.132916983217,
+          "error_message": "Authentication failed: Token request error: Authentication failed: Client error '403 Forbidden' for url 'http://localhost:8085/intent/token'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/eaa46e6f-48d7-49f5-92dc-dce3c740fe80",
+          "details": {}
+        }
+      }
+    },
+    "T9": {
+      "oauth": {
+        "threat_id": "T9",
+        "threat_name": "Scope Inflation",
+        "category": "Elevation of Privilege",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 5024.298583157361,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/e352575c-e7cc-499f-9a9a-b8469c79834b",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 5024.298583157361,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/e352575c-e7cc-499f-9a9a-b8469c79834b",
+          "details": {
+            "message": "SCOPE INFLATION ATTACK SUCCEEDED: OAuth mode allowed scope inflation by attacking agent.",
+            "tool_result": {
+              "file_path": "config.json",
+              "content": "file content...",
+              "scope_used": "write:files:all",
+              "attack_succeeded": true,
+              "files_written": [
+                {
+                  "path": "/secrets/api_keys.json",
+                  "content": "stolen_data"
+                },
+                {
+                  "path": "/admin/users.json",
+                  "content": "backdoor_user"
+                },
+                {
+                  "path": "/config/malware.sh",
+                  "content": "malicious_script"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T9",
+        "threat_name": "Scope Inflation",
+        "category": "Elevation of Privilege",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A7: Cryptographic Intent Token Binding, A8: Workflow Validation",
+        "detection_time_ms": 3565.8794578630477,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/44e0eaf1-20c8-4369-b1d1-8955d8215dee",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A7: Cryptographic Intent Token Binding, A8: Workflow Validation",
+          "detection_time_ms": 3565.8794578630477,
+          "error_message": "Authentication failed: Token request error: Authentication failed: Client error '403 Forbidden' for url 'http://localhost:8085/intent/token'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/44e0eaf1-20c8-4369-b1d1-8955d8215dee",
+          "details": {}
+        }
+      }
+    },
+    "T10": {
+      "oauth": {
+        "threat_id": "T10",
+        "threat_name": "Intent Origin Forgery",
+        "category": "Repudiation",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 5040.484833996743,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/d7f79b4d-f436-4b26-8486-498ec11b9cb1",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 5040.484833996743,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/d7f79b4d-f436-4b26-8486-498ec11b9cb1",
+          "details": {
+            "message": "INTENT FORGERY ATTACK SUCCEEDED: OAUTH mode does not support agentic manipulations of original intent.",
+            "tool_result": {
+              "payment_id": "forged_pay_999",
+              "amount": 10000.0,
+              "recipient": "attacker@evil.com",
+              "user_authorized": true,
+              "timestamp": 1763327246.475971,
+              "forged": true,
+              "attack_succeeded": true,
+              "status": "processed"
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T10",
+        "threat_name": "Intent Origin Forgery",
+        "category": "Repudiation",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A9: Cryptographic Delegation Chains, A10: Workflow Execution Logging",
+        "detection_time_ms": 3177.2322920151055,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/57e260f3-e9ea-4905-9f96-f54d10fb7b83",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A9: Cryptographic Delegation Chains, A10: Workflow Execution Logging",
+          "detection_time_ms": 3177.2322920151055,
+          "error_message": "Authentication failed: Token request error: Authentication failed: Client error '403 Forbidden' for url 'http://localhost:8085/intent/token'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/57e260f3-e9ea-4905-9f96-f54d10fb7b83",
+          "details": {}
+        }
+      }
+    },
+    "T11": {
+      "oauth": {
+        "threat_id": "T11",
+        "threat_name": "Delegation Chain Manipulation",
+        "category": "Repudiation",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 7787.060624919832,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/2bedc0cf-babe-4dad-8bca-ec4358dd71fa",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 7787.060624919832,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/2bedc0cf-babe-4dad-8bca-ec4358dd71fa",
+          "details": {
+            "message": "ATTACK SUCCEEDED: Operation executed without required approval. System failed to validate workflow dependencies.",
+            "tool_result": {
+              "request_id": "req_t11_123",
+              "status": "executed_without_approval",
+              "delegation_chain": [
+                "T11Initiator"
+              ],
+              "attack_type": "delegation_chain_bypass",
+              "skipped_step": "approve_request",
+              "incomplete_chain": [
+                "T11Initiator",
+                "T11MaliciousExecutor"
+              ],
+              "should_include": [
+                "T11Initiator",
+                "T11Approver",
+                "T11MaliciousExecutor"
+              ],
+              "bypassed_approval": true
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T11",
+        "threat_name": "Delegation Chain Manipulation",
+        "category": "Repudiation",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A9: Cryptographic Delegation Chains, A6:  Proof of Possession",
+        "detection_time_ms": 6932.038208004087,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/1f239b8d-8323-4b45-ac66-1e538fa6a9ca",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A9: Cryptographic Delegation Chains, A6:  Proof of Possession",
+          "detection_time_ms": 6932.038208004087,
+          "error_message": "Authentication failed: Token request error: Authentication failed: Client error '403 Forbidden' for url 'http://localhost:8085/intent/token'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/1f239b8d-8323-4b45-ac66-1e538fa6a9ca",
+          "details": {}
+        }
+      }
+    },
+    "T12": {
+      "oauth": {
+        "threat_id": "T12",
+        "threat_name": "Agent Configuration Exposure",
+        "category": "Information Disclosure",
+        "auth_mode": "oauth",
+        "attack_succeeded": true,
+        "blocked_by": null,
+        "detection_time_ms": 7419.617915991694,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/9a9f1440-9bce-47bb-9167-b0054e728891",
+        "details": {
+          "attack_succeeded": true,
+          "blocked_by": null,
+          "detection_time_ms": 7419.617915991694,
+          "error_message": null,
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/9a9f1440-9bce-47bb-9167-b0054e728891",
+          "details": {
+            "message": "ATTACK SUCCEEDED (Information Disclosure Vulnerability!)",
+            "tool_result": {
+              "status": "processed",
+              "data": "Patch all known critical CVEs in juice-shop/juice-shop repo at commit bac42662a7abc1e051133b9dd0f57a10b1d88187 on branch v11.1.3.",
+              "security_breached": true,
+              "extracted_data": {
+                "prompt": "Full prompt text from client code",
+                "exploit": "Modified and executed successfully",
+                "attack_method": "Read client + modify + execute"
+              },
+              "vulnerability": "OAuth: No registration, no checksum validation",
+              "exploitation": "Can modify and execute with changed prompts"
+            }
+          }
+        }
+      },
+      "intent": {
+        "threat_id": "T12",
+        "threat_name": "Agent Configuration Exposure",
+        "category": "Information Disclosure",
+        "auth_mode": "intent",
+        "attack_succeeded": false,
+        "blocked_by": "A1: Agent Checksum Verification, A2: Registration First Security Model",
+        "detection_time_ms": 7103.778708027676,
+        "error_message": null,
+        "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/5a0af156-d495-4464-93b0-dc09fcfada16",
+        "details": {
+          "attack_succeeded": false,
+          "blocked_by": "A1: Agent Checksum Verification, A2: Registration First Security Model",
+          "detection_time_ms": 7103.778708027676,
+          "error_message": "Intent token could not be used for breach. The token does not expose an agent or workflow specific details.",
+          "langsmith_trace_url": "https://smith.langchain.com/o/f6a33d94-4382-55f0-93c8-fd0f47ad8100/projects/p/304dd984-46dd-4ea6-80eb-a2bf97fbe44c/r/5a0af156-d495-4464-93b0-dc09fcfada16",
+          "details": {
+            "tool_result": {
+              "status": "processed",
+              "data": "Patch all known critical CVEs in juice-shop/juice-shop@v11.1.3 (commit bac42662a7abc1e051133b9dd0f57a10b1d88187)",
+              "security_breached": false,
+              "decoded_token": {
+                "iss": "http://localhost:8085",
+                "aud": "api.localhost.data",
+                "sub": "T12SecureAgent",
+                "exp": 1763330336,
+                "iat": 1763327336,
+                "jti": "token_c82b7f22",
+                "scope": "data:process",
+                "cnf": {
+                  "jwk": {
+                    "kty": "RSA",
+                    "use": "sig",
+                    "alg": "RS256",
+                    "n": "t8I3m2S76DCe6lCZQd-8ZQy51Y8jz0M5ovMDXE8Ezuuq5LXB9rOwplVcboj8LByeKCj7Xt72UfXdsPpL0NW9OZi66SzydMTiu1JdF4itTXq66VgpzAQ-Bj1qkSw80FNla4f6TEZW423LL_sRK-8xF_RBCloWu3JEgp7yJ3xGLU-fMrEuyANg1c1f-8zZpUOXn5o5qRK2JknDs-Ijsb7sAKvetJFBkXTGDtPMbxhV5C2hrDLda_605wEA-wbOFs6ESjPN4wJNcms-HKjpuheOcaYlcmjseqguTv4RAKDarTgjY-PvpMt3BqSDCcBvDdZJDkSp6PS3Gd8cIiqzBfpoBQ",
+                    "e": "AQAB"
+                  }
+                },
+                "intent": {
+                  "workflow_id": "config_exposure_v1.0",
+                  "workflow_step": {
+                    "step_id": "t12_process_sensitive_data",
+                    "agent_id": "T12SecureAgent",
+                    "tool_name": "t12_process_sensitive_data",
+                    "started_at": 1763327336.7363799
+                  },
+                  "executed_by": "T12SecureAgent",
+                  "delegation_chain": "4fa21d205773e52a",
+                  "step_sequence_hash": "4fa21d205773e52a"
+                },
+                "agent_proof": {
+                  "agent_checksum": "8b23145e7c37014d4fe6441e5e7316b3541dd9bdf788403f4311165355d317c0",
+                  "registration_id": "reg_T12SecureAgent_1763315951"
+                }
+              },
+              "client_exposure": "Possible (client's choice)",
+              "protection": {
+                "registration": "Required for execution",
+                "checksum_validation": "Runtime must match registration",
+                "idp_endpoints": "Return checksums only (raw hash)",
+                "intent_tokens": "Contain checksums only (raw hash)",
+                "execution": "Cannot run with unregistered/modified agents"
+              },
+              "key_insight": "Client exposure doesn't matter - cannot execute unregistered agents"
+            }
+          }
+        }
+      }
+    }
+  },
+  "performance_results": {
+    "token_minting": {
+      "oauth": {
+        "checksum_ms": 0,
+        "token_ms": 67.982
+      },
+      "intent": {
+        "checksum_ms": 0.20675,
+        "token_ms": 85.92983333333335
+      }
+    },
+    "end_to_end": {
+      "oauth": {
+        "llm_ms": 960.4251025641025,
+        "tool_ms": 848.3959285714285,
+        "token_ms": 67.982,
+        "checksum_ms": 0,
+        "total_ms": 696.3027633333334
+      },
+      "intent": {
+        "llm_ms": 1024.3469210526316,
+        "tool_ms": 806.790888888889,
+        "token_ms": 85.92983333333335,
+        "checksum_ms": 0.20675,
+        "total_ms": 726.0518120300752
+      }
+    }
+  }
+}

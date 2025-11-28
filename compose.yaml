@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  idp:
+    build:
+      context: .
+      target: idp
+    expose: 
+      - 8085
+    environment:
+      - ISSUER=http://idp.localhost
+
+  api:
+    build:
+      context: .
+      target: api
+    expose: 
+      - 8086
+    environment:
+      - EXPECTED_ISS=http://idp.localhost
+      - IDP_URL=http://idp.localhost
+      - API_URL=http://api.localhost
+      - EXPECTED_AUD="api.localhost.github,api.localhost.osv"
+      - GITHUB_TOKEN=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
+      - OSV_BASE_URL=https://api.osv.dev
+    depends_on: [idp]
+
+  demo:
+    build:
+      context: .
+      target: runner
+    expose:
+      - 8087
+    environment:
+      - IDP_URL=http://idp.localhost
+      - API_URL=http://api.localhost
+      - GITHUB_TOKEN=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
+      - OPENAI_API_KEY=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
+      - LANGSMITH_TRACING=true
+      - LANGSMITH_API_KEY=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
+      - LANGSMITH_PROJECT="Patchet"
+      - LANGCHAIN_API_KEY=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
+      - LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+    depends_on: [idp, api]
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on: [idp, api]

@@ -14,8 +14,20 @@ langchain = "*"
 langgraph = "*"
 langchain-openai = "*"
 pyyaml = "*"
+requests = "*"
+tiktoken = "*"
+aiohttp = "*"
+aiodns = "*"
+brotli = "*"
+cvss = "*"
+python-jose = "*"
+python-multipart = "*"
+langchain-anthropic = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
+respx = "*"
 
 [requires]
 python_version = "3.12"

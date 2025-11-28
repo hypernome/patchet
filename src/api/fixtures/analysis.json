@@ -1,0 +1,971 @@
+[
+    {
+        "id": "GHSA-grv7-fg5c-xmjg",
+        "cve_id": "CVE-2024-4068",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "braces",
+        "fixed_in": "3.0.3",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-78wr-2p64-hpwj",
+        "cve_id": "CVE-2024-47554",
+        "severity": "HIGH",
+        "manifest": "pom.xml",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "Maven",
+            "manifest_globs": [
+                "*/pom.xml"
+            ],
+            "manifest_paths": [
+                "pom.xml"
+            ]
+        },
+        "package": "commons-io:commons-io",
+        "fixed_in": "2.14.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gwrp-pvrq-jmwv",
+        "cve_id": "CVE-2021-29425",
+        "severity": "MEDIUM",
+        "manifest": "pom.xml",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "Maven",
+            "manifest_globs": [
+                "*/pom.xml"
+            ],
+            "manifest_paths": [
+                "pom.xml"
+            ]
+        },
+        "package": "commons-io:commons-io",
+        "fixed_in": "2.7",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gwrp-pvrq-jmwv",
+        "cve_id": "CVE-2021-29425",
+        "severity": "MEDIUM",
+        "manifest": "pom.xml",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "Maven",
+            "manifest_globs": [
+                "*/pom.xml"
+            ],
+            "manifest_paths": [
+                "pom.xml"
+            ]
+        },
+        "package": "org.checkerframework.annotatedlib:commons-io",
+        "fixed_in": "2.7",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-pxg6-pf52-xh8x",
+        "cve_id": "CVE-2024-47764",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "cookie",
+        "fixed_in": "0.7.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-xwcq-pm8m-c4vf",
+        "cve_id": "CVE-2023-46233",
+        "severity": "CRITICAL",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "crypto-js",
+        "fixed_in": "4.2.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gxpj-cx7g-858c",
+        "cve_id": "CVE-2017-16137",
+        "severity": "LOW",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "debug",
+        "fixed_in": "2.6.9",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gxpj-cx7g-858c",
+        "cve_id": "CVE-2017-16137",
+        "severity": "LOW",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "debug",
+        "fixed_in": "3.1.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gxpj-cx7g-858c",
+        "cve_id": "CVE-2017-16137",
+        "severity": "LOW",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "debug",
+        "fixed_in": "3.2.7",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gxpj-cx7g-858c",
+        "cve_id": "CVE-2017-16137",
+        "severity": "LOW",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "debug",
+        "fixed_in": "4.3.1",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-6g6m-m6h5-w9gf",
+        "cve_id": "CVE-2020-15084",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "express-jwt",
+        "fixed_in": "6.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-fjxv-7rqg-78g4",
+        "cve_id": "CVE-2025-7783",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "form-data",
+        "fixed_in": "2.5.4",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-fjxv-7rqg-78g4",
+        "cve_id": "CVE-2025-7783",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "form-data",
+        "fixed_in": "3.0.4",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-fjxv-7rqg-78g4",
+        "cve_id": "CVE-2025-7783",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "form-data",
+        "fixed_in": "4.0.4",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-pfrx-2q88-qq97",
+        "cve_id": "CVE-2022-33987",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "got",
+        "fixed_in": "12.1.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-pfrx-2q88-qq97",
+        "cve_id": "CVE-2022-33987",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "got",
+        "fixed_in": "11.8.5",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-rc47-6667-2j5j",
+        "cve_id": "CVE-2022-25881",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "http-cache-semantics",
+        "fixed_in": "4.1.1",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-rc47-6667-2j5j",
+        "cve_id": "CVE-2022-25881",
+        "severity": "HIGH",
+        "manifest": "pom.xml",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "Maven",
+            "manifest_globs": [
+                "*/pom.xml"
+            ],
+            "manifest_paths": [
+                "pom.xml"
+            ]
+        },
+        "package": "org.webjars.npm:http-cache-semantics",
+        "fixed_in": "4.1.1",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-c7hr-j4mj-j2w6",
+        "cve_id": "CVE-2015-9235",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "jsonwebtoken",
+        "fixed_in": "4.2.2",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-8cf7-32gw-wr33",
+        "cve_id": "CVE-2022-23539",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "jsonwebtoken",
+        "fixed_in": "9.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-hjrf-2m68-5959",
+        "cve_id": "CVE-2022-23541",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "jsonwebtoken",
+        "fixed_in": "9.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-qwph-4952-7xr6",
+        "cve_id": "CVE-2022-23540",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "jsonwebtoken",
+        "fixed_in": "9.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-gjcw-v447-2w7q",
+        "cve_id": "CVE-2016-1000223",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "jws",
+        "fixed_in": "3.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-jf85-cpcp-j695",
+        "cve_id": "CVE-2019-10744",
+        "severity": "CRITICAL",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.12",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-jf85-cpcp-j695",
+        "cve_id": "CVE-2019-10744",
+        "severity": "CRITICAL",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-es",
+        "fixed_in": "4.17.14",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-jf85-cpcp-j695",
+        "cve_id": "CVE-2019-10744",
+        "severity": "CRITICAL",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-amd",
+        "fixed_in": "4.17.13",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-jf85-cpcp-j695",
+        "cve_id": "CVE-2019-10744",
+        "severity": "CRITICAL",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash.defaultsdeep",
+        "fixed_in": "4.6.1",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-fvqr-27wr-82fm",
+        "cve_id": "CVE-2018-3721",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.5",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-4xc9-xhrj-v574",
+        "cve_id": "CVE-2018-16487",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.11",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-x5rq-j2xg-h7qm",
+        "cve_id": "CVE-2019-1010266",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.11",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-x5rq-j2xg-h7qm",
+        "cve_id": "CVE-2019-1010266",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-es",
+        "fixed_in": "4.17.11",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-x5rq-j2xg-h7qm",
+        "cve_id": "CVE-2019-1010266",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-amd",
+        "fixed_in": "4.17.11",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-29mw-wpgm-hmr9",
+        "cve_id": "CVE-2020-28500",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.21",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-29mw-wpgm-hmr9",
+        "cve_id": "CVE-2020-28500",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-es",
+        "fixed_in": "4.17.21",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-35jh-r3h4-6jhm",
+        "cve_id": "CVE-2021-23337",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.21",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-35jh-r3h4-6jhm",
+        "cve_id": "CVE-2021-23337",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-es",
+        "fixed_in": "4.17.21",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-p6mc-m468-83gw",
+        "cve_id": "CVE-2020-8203",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash",
+        "fixed_in": "4.17.19",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-p6mc-m468-83gw",
+        "cve_id": "CVE-2020-8203",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "lodash-es",
+        "fixed_in": "4.17.20",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-952p-6rrq-rcjv",
+        "cve_id": "CVE-2024-4067",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "micromatch",
+        "fixed_in": "4.0.8",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-87vv-r9j6-g5qv",
+        "cve_id": "CVE-2016-4055",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "moment",
+        "fixed_in": "2.11.2",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-446m-mv8f-q348",
+        "cve_id": "CVE-2017-18214",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "moment",
+        "fixed_in": "2.19.3",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-8hfj-j24r-96c4",
+        "cve_id": "CVE-2022-24785",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "moment",
+        "fixed_in": "2.29.2",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-44fp-w29j-9vj5",
+        "cve_id": "CVE-2025-47935",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "multer",
+        "fixed_in": "2.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-4pg4-qvpc-4q3h",
+        "cve_id": "CVE-2025-47944",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "multer",
+        "fixed_in": "2.0.0",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-g5hg-p3ph-g8qg",
+        "cve_id": "CVE-2025-48997",
+        "severity": "UNKNOWN",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "multer",
+        "fixed_in": "2.0.1",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-fjgf-rc76-4x9p",
+        "cve_id": "CVE-2025-7338",
+        "severity": "HIGH",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "multer",
+        "fixed_in": "2.0.2",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-p493-635q-r6gr",
+        "cve_id": "CVE-2021-21353",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "pug",
+        "fixed_in": "3.0.1",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-p493-635q-r6gr",
+        "cve_id": "CVE-2021-21353",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "pug-code-gen",
+        "fixed_in": "2.0.3",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-p493-635q-r6gr",
+        "cve_id": "CVE-2021-21353",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "pug-code-gen",
+        "fixed_in": "3.0.2",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-3965-hpx2-q597",
+        "cve_id": "CVE-2024-36361",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "pug-code-gen",
+        "fixed_in": "3.0.3",
+        "is_transitive": true
+    },
+    {
+        "id": "GHSA-3965-hpx2-q597",
+        "cve_id": "CVE-2024-36361",
+        "severity": "MEDIUM",
+        "manifest": "package.json",
+        "lockfile": null,
+        "ecosystem": {
+            "name": "npm",
+            "manifest_globs": [
+                "*/package.json"
+            ],
+            "manifest_paths": [
+                "package.json"
+            ]
+        },
+        "package": "pug",
+        "fixed_in": "3.0.3",
+        "is_transitive": true
+    }
+]

@@ -1,0 +1,35 @@
+{
+    "workflow_id": "vulnerability_assessment_v1", 
+    "workflow_type": "dag", 
+    "steps": {
+        "list_files": {
+            "agent": "Planner", 
+            "action": "list_files", 
+            "dependencies": []
+        }, 
+        "generate_sbom_with_vulns": {
+            "agent": "Planner", 
+            "action": "generate_sbom_with_vulns", 
+            "dependencies": [
+                "list_files"
+            ]
+        }, 
+        "triage_vulns": {
+            "agent": "Planner", 
+            "action": "triage_vulns", 
+            "dependencies": [
+                "list_files", 
+                "generate_sbom_with_vulns"
+            ]
+        }, 
+        "bump_versions": {
+            "agent": "Patcher", 
+            "action": "bump_versions", 
+            "dependencies": [
+                "list_files", 
+                "generate_sbom_with_vulns", 
+                "triage_vulns"
+            ]
+        }
+    }
+}

@@ -1,0 +1,176 @@
+\begin{table}[h]
+\centering
+\caption{Spoofing Threat Results}
+\label{tab:spoofing-results}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Threat} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Detection} \\
+\hline
+Agent Identity Spoofing & ✗ (100\%) & ✓ (0\%) & A2: Registration First Security Model \\
+Token Replay Attacks & ✗ (100\%) & ✓ (0\%) & A6:  Proof of Possession \\
+Shim Library Impersonation & ✗ (100\%) & ✓ (0\%) & A1: Agent Checksum Verification, A2: Registration First Security Model \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Tampering Threat Results}
+\label{tab:tampering-results}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Threat} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Detection} \\
+\hline
+Runtime Code Modification & ✗ (100\%) & ✓ (0\%) & A1: Agent Checksum Verification, A12: Prompt Integrity Validation \\
+Prompt Injection Attacks & ✗ (100\%) & ✓ (0\%) & A12: Prompt Integrity Validation \\
+Workflow Definition Tampering & ✗ (100\%) & ✓ (0\%) & A8: Workflow Validation, A11: Agent Registration Versioning \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Privilege Escalation Results}
+\label{tab:privilege-results}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Threat} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Detection} \\
+\hline
+Cross-Agent Privilege Escalation & ✗ (100\%) & ✓ (0\%) & A3, A7, A8 \\
+Workflow Step Bypass & ✗ (100\%) & ✓ (0\%) & A8: Workflow Validation, A10: Workflow Execution Logging \\
+Scope Inflation & ✗ (100\%) & ✓ (0\%) & A7: Cryptographic Intent Token Binding, A8: Workflow Validation \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Repudiation Threat Results}
+\label{tab:repudiation-results}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Threat} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Detection} \\
+\hline
+Intent Origin Forgery & ✗ (100\%) & ✓ (0\%) & A9: Cryptographic Delegation Chains, A10: Workflow Execution Logging \\
+Delegation Chain Manipulation & ✗ (100\%) & ✓ (0\%) & A9: Cryptographic Delegation Chains, A6:  Proof of Possession \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Information Disclosure Results}
+\label{tab:disclosure-results}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Threat} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Detection} \\
+\hline
+Agent Configuration Exposure & ✗ (100\%) & ✓ (0\%) & A1: Agent Checksum Verification, A2: Registration First Security Model \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Overall Security Effectiveness}
+\label{tab:security-summary}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metric} & \textbf{OAuth Baseline} & \textbf{Agentic JWT} \\
+\hline
+Threats Tested & 12 & 12 \\
+Attacks Blocked & 0 (0\%) & 12 (100\%) \\
+False Positives & N/A & 0 \\
+Detection Time & N/A & <4694.8ms \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Token Minting Performance}
+\label{tab:token-minting}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Operation} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Overhead} \\
+\hline
+Checksum computation & - & 0.0ms & +0.0ms \\
+Workflow validation & - & 0.0ms & +0.0ms \\
+Delegation chain check & - & 0.0ms & +0.0ms \\
+JWT signing & 2.1ms & 2.1ms & 0ms \\
+\hline
+\textbf{Total} & \textbf{2.1ms} & \textbf{4.2ms} & \textbf{+2.1ms (100\%)} \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Workflow Execution Performance}
+\label{tab:workflow-performance}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Component} & \textbf{OAuth} & \textbf{A-JWT} & \textbf{Overhead} \\
+\hline
+Agent reasoning (LLM) & 960ms & 1240ms & 0ms \\
+Tool execution & 848ms & 180ms & 0ms \\
+Token operations & 68.0ms & 12.6ms & +-55.4ms \\
+Workflow tracking & - & 0.8ms & +0.8ms \\
+\hline
+\textbf{Total} & \textbf{696ms} & \textbf{1433ms} & \textbf{+736.7ms (105.8\%)} \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Token Minting Throughput}
+\label{tab:throughput}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Concurrent Requests} & \textbf{OAuth} & \textbf{A-JWT} \\
+\hline
+10 req/s & 0.0ms & 0.0ms \\
+100 req/s & 0.0ms & 0.0ms \\
+1000 req/s & 0.0ms & 0.0ms \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Security Anchors vs. Threats}
+\label{tab:anchor-effectiveness}
+\begin{tabular}{|l|l|c|}
+\hline
+\textbf{Anchor} & \textbf{Threats Mitigated} & \textbf{Count} \\
+\hline
+A1: Agent Identity & T1, T3, T4, T5, T7, T12 & 6 \\
+A2: Pre-Registration & T1, T2 & 2 \\
+A3: Bridge Identifier & T1, T7 & 2 \\
+A4: Client Credentials & T1, T2 & 2 \\
+A5: Shim Library Integrity & T3, T4 & 2 \\
+A6: Workflow Authorization & T6, T7, T8, T9 & 4 \\
+A7: Delegation Chain & T7, T8, T9, T10, T11 & 5 \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{STRIDE Category Protection}
+\label{tab:stride-coverage}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{STRIDE Category} & \textbf{Threats} & \textbf{Coverage} \\
+\hline
+Spoofing & T1, T2, T3 & 100\% (3/3) \\
+Tampering & T4, T5, T6 & 100\% (3/3) \\
+Repudiation & T10, T11 & 100\% (2/2) \\
+Information Disclosure & T12 & 100\% (1/1) \\
+Elevation of Privilege & T7, T8, T9 & 100\% (3/3) \\
+\hline
+\textbf{Total} & \textbf{T1-T12} & \textbf{100\% (12/12)} \\
+\hline
+\end{tabular}
+\end{table}

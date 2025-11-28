@@ -1,0 +1,18 @@
+{
+    local_certs
+}
+
+idp.localhost {
+    encode gzip
+    reverse_proxy idp:8085
+}
+
+api.localhost {
+    encode gzip
+    reverse_proxy api:8086
+}
+
+demo.localhost {
+    encode gzip
+    reverse_proxy demo:8087
+}
