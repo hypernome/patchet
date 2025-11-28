@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Experimental traces for Agentic JWT paper - IEEE Access 2025">
+    <meta name="author" content="Abhishek Goswami">
+    <title>Agentic JWT - Experimental Traces</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .meta-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .meta-item {
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .meta-item strong {
+            display: block;
+            color: #667eea;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .meta-item a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        
+        .meta-item a:hover {
+            text-decoration: underline;
+        }
+        
+        h2 {
+            color: #333;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        th, td { 
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th { 
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .trace-link {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+            text-decoration: none;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        
+        .trace-link:hover {
+            background: #1976d2;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .live-link {
+            font-size: 0.8em;
+            color: #666;
+            margin-left: 8px;
+        }
+        
+        .live-link a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        
+        .live-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .status-success {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+        
+        .status-success::before {
+            content: "✓ ";
+            font-size: 1.2em;
+        }
+        
+        .stride-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            background: #f0f0f0;
+            color: #555;
+        }
+        
+        .stride-spoofing { background: #ffebee; color: #c62828; }
+        .stride-tampering { background: #fff3e0; color: #ef6c00; }
+        .stride-privilege { background: #f3e5f5; color: #7b1fa2; }
+        .stride-repudiation { background: #e8f5e9; color: #2e7d32; }
+        .stride-disclosure { background: #e1f5fe; color: #0277bd; }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            margin: 10px 0;
+        }
+        
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            color: #666;
+            text-align: center;
+        }
+        
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            table {
+                font-size: 0.9em;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+            }
+            
+            .trace-link {
+                font-size: 0.8em;
+                padding: 4px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Agentic JWT: Experimental Traces</h1>
+            <p>Complete execution traces for security validation and reproducibility</p>
+        </div>
+
+        <div class="meta-info">
+            <div class="meta-item">
+                <strong>Paper Title</strong>
+                Agentic JWT: A Secure Delegation Protocol for Autonomous AI Agents
+            </div>
+            <div class="meta-item">
+                <strong>Author</strong>
+                Abhishek Goswami, Senior Member, IEEE
+            </div>
+            <div class="meta-item">
+                <strong>Journal</strong>
+                IEEE Access (2025)
+            </div>
+            <div class="meta-item">
+                <strong>arXiv Preprint</strong>
+                <a href="https://arxiv.org/abs/2509.13597" target="_blank">2509.13597</a>
+            </div>
+            <div class="meta-item">
+                <strong>Patent Application</strong>
+                US 19/315,486
+            </div>
+            <div class="meta-item">
+                <strong>GitHub Repository</strong>
+                <a href="https://github.com/YOUR-USERNAME/patchet" target="_blank">patchet</a>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <p><strong>About these traces:</strong> All execution traces were recorded using LangSmith during security validation experiments described in Section VI of the paper. Each trace contains complete execution details including LLM reasoning steps, tool invocations, token minting requests, and timing measurements.</p>
+            <p><strong>Reproducibility:</strong> Traces are provided in two formats: (1) archived HTML snapshots for permanent access, and (2) live interactive traces on LangSmith for real-time exploration (if project is public).</p>
+        </div>
+
+        <h2>Threat Scenarios & Execution Traces</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Threat Name</th>
+                    <th>STRIDE</th>
+                    <th>OAuth 2.0 Trace</th>
+                    <th>Agentic JWT Trace</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>T1</strong></td>
+                    <td>Agent Identity Spoofing</td>
+                    <td><span class="stride-badge stride-spoofing">Spoofing</span></td>
+                    <td>
+                        <a href="archived_traces/T01_41ac65e8_oauth.html" class="trace-link" target="_blank">41ac65e8</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T01_0ca33d76_ajwt.html" class="trace-link" target="_blank">0ca33d76</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 400)</td>
+                </tr>
+                <tr>
+                    <td><strong>T2</strong></td>
+                    <td>Token Replay Attacks</td>
+                    <td><span class="stride-badge stride-spoofing">Spoofing</span></td>
+                    <td>
+                        <a href="archived_traces/T02_8fd4713c_oauth.html" class="trace-link" target="_blank">8fd4713c</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T02_f7b8a5cf_ajwt.html" class="trace-link" target="_blank">f7b8a5cf</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 401)</td>
+                </tr>
+                <tr>
+                    <td><strong>T3</strong></td>
+                    <td>Shim Library Impersonation</td>
+                    <td><span class="stride-badge stride-spoofing">Spoofing</span></td>
+                    <td>
+                        <a href="archived_traces/T03_9c1b5d1e_oauth.html" class="trace-link" target="_blank">9c1b5d1e</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T03_80805ddb_ajwt.html" class="trace-link" target="_blank">80805ddb</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (Client-side)</td>
+                </tr>
+                <tr>
+                    <td><strong>T4</strong></td>
+                    <td>Runtime Code Modification</td>
+                    <td><span class="stride-badge stride-tampering">Tampering</span></td>
+                    <td>
+                        <a href="archived_traces/T04_70174696_oauth.html" class="trace-link" target="_blank">70174696</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T04_48bdd65b_ajwt.html" class="trace-link" target="_blank">48bdd65b</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (Checksum)</td>
+                </tr>
+                <tr>
+                    <td><strong>T5</strong></td>
+                    <td>Prompt Injection Attacks</td>
+                    <td><span class="stride-badge stride-tampering">Tampering</span></td>
+                    <td>
+                        <a href="archived_traces/T05_1be5a858_oauth.html" class="trace-link" target="_blank">1be5a858</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T05_f1062192_ajwt.html" class="trace-link" target="_blank">f1062192</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (Template)</td>
+                </tr>
+                <tr>
+                    <td><strong>T6</strong></td>
+                    <td>Workflow Definition Tampering</td>
+                    <td><span class="stride-badge stride-tampering">Tampering</span></td>
+                    <td>
+                        <a href="archived_traces/T06_5f14eabb_oauth.html" class="trace-link" target="_blank">5f14eabb</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T06_0da6cf62_ajwt.html" class="trace-link" target="_blank">0da6cf62</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 403)</td>
+                </tr>
+                <tr>
+                    <td><strong>T7</strong></td>
+                    <td>Cross-Agent Privilege Escalation</td>
+                    <td><span class="stride-badge stride-privilege">Privilege Esc.</span></td>
+                    <td>
+                        <a href="archived_traces/T07_6a04b024_oauth.html" class="trace-link" target="_blank">6a04b024</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T07_44d2f82f_ajwt.html" class="trace-link" target="_blank">44d2f82f</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 403)</td>
+                </tr>
+                <tr>
+                    <td><strong>T8</strong></td>
+                    <td>Workflow Step Bypass</td>
+                    <td><span class="stride-badge stride-privilege">Privilege Esc.</span></td>
+                    <td>
+                        <a href="archived_traces/T08_4c9613f7_oauth.html" class="trace-link" target="_blank">4c9613f7</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T08_eaa46e6f_ajwt.html" class="trace-link" target="_blank">eaa46e6f</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 403)</td>
+                </tr>
+                <tr>
+                    <td><strong>T9</strong></td>
+                    <td>Scope Inflation</td>
+                    <td><span class="stride-badge stride-privilege">Privilege Esc.</span></td>
+                    <td>
+                        <a href="archived_traces/T09_e352575c_oauth.html" class="trace-link" target="_blank">e352575c</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T09_44e0eaf1_ajwt.html" class="trace-link" target="_blank">44e0eaf1</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 403)</td>
+                </tr>
+                <tr>
+                    <td><strong>T10</strong></td>
+                    <td>Intent Origin Forgery</td>
+                    <td><span class="stride-badge stride-repudiation">Repudiation</span></td>
+                    <td>
+                        <a href="archived_traces/T10_d7f79b4d_oauth.html" class="trace-link" target="_blank">d7f79b4d</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T10_57e260f3_ajwt.html" class="trace-link" target="_blank">57e260f3</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 403)</td>
+                </tr>
+                <tr>
+                    <td><strong>T11</strong></td>
+                    <td>Delegation Chain Manipulation</td>
+                    <td><span class="stride-badge stride-repudiation">Repudiation</span></td>
+                    <td>
+                        <a href="archived_traces/T11_2bedc0cf_oauth.html" class="trace-link" target="_blank">2bedc0cf</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T11_1f239b8d_ajwt.html" class="trace-link" target="_blank">1f239b8d</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (HTTP 403)</td>
+                </tr>
+                <tr>
+                    <td><strong>T12</strong></td>
+                    <td>Agent Configuration Exposure</td>
+                    <td><span class="stride-badge stride-disclosure">Info. Disclosure</span></td>
+                    <td>
+                        <a href="archived_traces/T12_9a9f1440_oauth.html" class="trace-link" target="_blank">9a9f1440</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td>
+                        <a href="archived_traces/T12_5a0af156_ajwt.html" class="trace-link" target="_blank">5a0af156</a>
+                        <span class="live-link">| <a href="https://smith.langchain.com" target="_blank">live</a></span>
+                    </td>
+                    <td class="status-success">Blocked (Checksum)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <p><strong>Note:</strong> Archived HTML snapshots provide permanent documentation of execution traces. Live LangSmith links (if available) offer interactive exploration of the same traces. Both formats contain identical execution data for verification purposes.</p>
+        </div>
+
+        <h2>Experimental Configuration</h2>
+        
+        <div class="meta-info">
+            <div class="meta-item">
+                <strong>LLM Model</strong>
+                GPT-4.1 (OpenAI)
+            </div>
+            <div class="meta-item">
+                <strong>Framework</strong>
+                LangChain / LangGraph
+            </div>
+            <div class="meta-item">
+                <strong>Hardware</strong>
+                AWS EC2 t3.xlarge
+            </div>
+            <div class="meta-item">
+                <strong>Python Version</strong>
+                3.11
+            </div>
+            <div class="meta-item">
+                <strong>Tracing System</strong>
+                LangSmith
+            </div>
+            <div class="meta-item">
+                <strong>Experiment Date</strong>
+                November 16, 2025
+            </div>
+        </div>
+
+        <footer>
+            <p>Experimental data for <em>"Agentic JWT: A Secure Delegation Protocol for Autonomous AI Agents"</em></p>
+            <p>Abhishek Goswami | <a href="https://github.com/YOUR-USERNAME/patchet">GitHub Repository</a> | <a href="https://arxiv.org/abs/2509.13597">arXiv:2509.13597</a></p>
+            <p style="margin-top: 10px; font-size: 0.9em;">Last updated: November 2025</p>
+        </footer>
+    </div>
+</body>
+</html>
