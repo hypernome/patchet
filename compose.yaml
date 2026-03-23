@@ -9,6 +9,9 @@ services:
       - 8085
     environment:
       - ISSUER=http://idp.localhost
+    volumes: 
+      - ./.runtime:/app/.runtime
+    restart: always
 
   api:
     build:
