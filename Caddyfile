@@ -16,3 +16,13 @@ demo.localhost {
     encode gzip
     reverse_proxy demo:8087
 }
+
+idp.unforge.org {
+    encode gzip
+    reverse_proxy idp:8085
+}
+
+api.unforge.org {
+    encode gzip
+    reverse_proxy api:8086
+}
