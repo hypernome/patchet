@@ -9,6 +9,9 @@ services:
       - 8085
     environment:
       - ISSUER=http://idp.localhost
+    volumes: 
+      - ./.runtime:/app/.runtime
+    restart: always
 
   api:
     build:
@@ -50,4 +53,6 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on: [idp, api]
