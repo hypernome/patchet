@@ -19,9 +19,9 @@ services:
       - 8086
     environment:
       - EXPECTED_ISS=http://idp.localhost
-      - IDP_URL=http://idp.localhost
+      - IDP_URL=http://idp:8085
       - API_URL=http://api.localhost
-      - EXPECTED_AUD="api.localhost.github,api.localhost.osv"
+      - EXPECTED_AUD="api.localhost.github,api.localhost.osv,api.localhost.building"
       - GITHUB_TOKEN=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
       - OSV_BASE_URL=https://api.osv.dev
     depends_on: [idp]
