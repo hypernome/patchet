@@ -5,6 +5,7 @@ from api.deployment import deployment_router
 from api.files import files_router
 from api.payment import payment_router
 from api.service_request import sr_router
+from api.building import building_router
 from api.auth import install_signature_middleware
 
 app = FastAPI(root_path="/")
@@ -17,7 +18,9 @@ app.include_router(deployment_router)
 app.include_router(files_router)
 app.include_router(payment_router)
 app.include_router(sr_router)
+app.include_router(building_router)
+
 
 @app.get("/health")
-def health(): 
-    return { "ok": True, "message": "API Running!" } 
+def health():
+    return {"ok": True, "message": "API Running!"}
