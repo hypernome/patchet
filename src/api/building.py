@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class BuildingState(BaseModel):
+class BuildingState:
     """Simulated smart building state"""
 
     def __init__(self):
