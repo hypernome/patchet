@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
 
-class AuthProfileName(Enum): 
+class AuthProfileName(Enum):
     planner = "planner"
     classifier = "classifier"
     patcher = "patcher"
@@ -9,6 +9,7 @@ class AuthProfileName(Enum):
     admin = "admin"
     intent_registration_admin = "intent_registration_admin"
     patchet = "patchet"
+    building_admin = "building_admin"
 
 class GrantType(Enum): 
     authorization_code = "authorization_code"
@@ -72,11 +73,21 @@ token_profiles: dict[AuthProfileName, AuthProfile] = {
     AuthProfileName.patchet: AuthProfile(
         id=AuthProfileName.patchet,
         config=OAuthConfig(
-            client_id=AuthProfileName.patchet.value, 
-            client_secret="patchet-admin", 
-            scope="", 
+            client_id=AuthProfileName.patchet.value,
+            client_secret="patchet-admin",
+            scope="",
             audience=""
-        ), 
+        ),
         description="Patchet demo client."
-    )
+    ),
+    AuthProfileName.building_admin: AuthProfile(
+        id=AuthProfileName.building_admin,
+        config=OAuthConfig(
+            client_id="building_admin",
+            client_secret="greentech123",
+            scope="",
+            audience=""
+        ),
+        description="Building admin client for IEEE GreenTech demo."
+    ),
 }

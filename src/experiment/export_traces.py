@@ -1,339 +1,275 @@
-"""
-Export LangSmith traces for Agentic JWT paper
-Author: Abhishek Goswami
-"""
+#!/usr/bin/env python3
+"""Export complete LangSmith traces to JSON"""
 
-import json
-import os
-from pathlib import Path
 from langsmith import Client
+import json
 from datetime import datetime
+from uuid import UUID
+from decimal import Decimal
+from typing import Any
+import os
+import time
 
-# Initialize LangSmith client
-client = Client()
-
-PROJECT_NAME = "304dd984-46dd-4ea6-80eb-a2bf97fbe44c"  
-
-# Threat scenario mapping (from Table 5 in the paper)
-THREAT_SCENARIOS = {
-    "T1": {
-        "name": "Agent Identity Spoofing",
-        "stride": "Spoofing",
-        "oauth_trace": "41ac65e8",
-        "ajwt_trace": "0ca33d76",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 400)",
-        "oauth_time": 1720.0,
-        "ajwt_time": 141.3
-    },
-    "T2": {
-        "name": "Token Replay Attacks",
-        "stride": "Spoofing",
-        "oauth_trace": "8fd4713c",
-        "ajwt_trace": "f7b8a5cf",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 401)",
-        "oauth_time": 7539.1,
-        "ajwt_time": 4877.5
-    },
-    "T3": {
-        "name": "Shim Library Impersonation",
-        "stride": "Spoofing",
-        "oauth_trace": "9c1b5d1e",
-        "ajwt_trace": "80805ddb",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked",
-        "oauth_time": 8782.6,
-        "ajwt_time": 9463.9
-    },
-    "T4": {
-        "name": "Runtime Code Modification",
-        "stride": "Tampering",
-        "oauth_trace": "70174696",
-        "ajwt_trace": "48bdd65b",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked",
-        "oauth_time": 3393.2,
-        "ajwt_time": 1871.0
-    },
-    "T5": {
-        "name": "Prompt Injection Attacks",
-        "stride": "Tampering",
-        "oauth_trace": "1be5a858",
-        "ajwt_trace": "f1062192",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked",
-        "oauth_time": 3594.8,
-        "ajwt_time": 1861.6
-    },
-    "T6": {
-        "name": "Workflow Definition Tampering",
-        "stride": "Tampering",
-        "oauth_trace": "5f14eabb",
-        "ajwt_trace": "0da6cf62",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 403)",
-        "oauth_time": 10402.2,
-        "ajwt_time": 5613.3
-    },
-    "T7": {
-        "name": "Cross-Agent Privilege Escalation",
-        "stride": "Privilege Escalation",
-        "oauth_trace": "6a04b024",
-        "ajwt_trace": "44d2f82f",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 403)",
-        "oauth_time": 6579.0,
-        "ajwt_time": 5530.7
-    },
-    "T8": {
-        "name": "Workflow Step Bypass",
-        "stride": "Privilege Escalation",
-        "oauth_trace": "4c9613f7",
-        "ajwt_trace": "eaa46e6f",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 403)",
-        "oauth_time": 7365.3,
-        "ajwt_time": 6199.1
-    },
-    "T9": {
-        "name": "Scope Inflation",
-        "stride": "Privilege Escalation",
-        "oauth_trace": "e352575c",
-        "ajwt_trace": "44e0eaf1",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 403)",
-        "oauth_time": 5024.3,
-        "ajwt_time": 3565.9
-    },
-    "T10": {
-        "name": "Intent Origin Forgery",
-        "stride": "Repudiation",
-        "oauth_trace": "d7f79b4d",
-        "ajwt_trace": "57e260f3",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 403)",
-        "oauth_time": 5040.5,
-        "ajwt_time": 3177.2
-    },
-    "T11": {
-        "name": "Delegation Chain Manipulation",
-        "stride": "Repudiation",
-        "oauth_trace": "2bedc0cf",
-        "ajwt_trace": "1f239b8d",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked (HTTP 403)",
-        "oauth_time": 7787.1,
-        "ajwt_time": 6932.0
-    },
-    "T12": {
-        "name": "Agent Configuration Exposure",
-        "stride": "Information Disclosure",
-        "oauth_trace": "9a9f1440",
-        "ajwt_trace": "5a0af156",
-        "oauth_outcome": "Attack succeeded",
-        "ajwt_outcome": "Blocked",
-        "oauth_time": 7419.6,
-        "ajwt_time": 7103.8
-    }
-}
-
-
-# Cache for all runs (fetch once, search many times)
-ALL_RUNS_CACHE = None
-
-
-def get_all_runs(threat_id):
-    """Fetch all runs from the project (cached)"""
-    global ALL_RUNS_CACHE
+def serialize_run(obj: Any) -> Any:
+    """Recursively serialize Run object to JSON-compatible format"""
     
-    if ALL_RUNS_CACHE is not None:
-        return ALL_RUNS_CACHE
-    
-    print("Fetching all runs from LangSmith project...")
-    print(f"   Project: {PROJECT_NAME}")
-    
-    time_format = "%m/%d/%Y %H:%M:%S"
-    filter=f'eq(name, "{threat_id}_attack")'
-    try:
-        # Fetch all runs from the project
-        all_runs = list(client.list_runs(
-            project_name=PROJECT_NAME,
-            start_time=datetime.strptime("11/16/2025 00:00:40", time_format),
-            end_time=datetime.strptime("11/16/2025 23:59:00", time_format), 
-            filter=filter
-        ))
-        
-        print(f"   Found {len(all_runs)} runs in project")
-        ALL_RUNS_CACHE = all_runs
-        return all_runs
-    
-    except Exception as e:
-        print(f"   Error fetching runs: {e}")
-        print("\n  Possible issues:")
-        print("   1. Check PROJECT_NAME is correct (line 15)")
-        print("   2. Verify LANGSMITH_API_KEY is set")
-        print("   3. Check project name in LangSmith UI")
-        return []
-
-
-def find_run_by_prefix(trace_prefix, threat_id):
-    """Find a LangSmith run by its 8-character prefix"""
-    all_runs = get_all_runs(threat_id)
-    
-    if not all_runs:
+    # Handle None
+    if obj is None:
         return None
     
-    # Search through all runs for matching prefix
-    for run in all_runs:
-        run_id_str = str(run.id)
-        if run_id_str.startswith(trace_prefix):
-            return run
+    # Handle datetime objects
+    if isinstance(obj, datetime):
+        return obj.isoformat()
     
-    # Also check trace_id (sometimes different from run id)
-    for run in all_runs:
-        if run.trace_id:
-            trace_id_str = str(run.trace_id)
-            if trace_id_str.startswith(trace_prefix):
-                return run
+    # Handle UUID objects
+    if isinstance(obj, UUID):
+        return str(obj)
     
-    print(f"      No run found for prefix: {trace_prefix}")
-    return None
+    # Handle Decimal objects (convert to float)
+    if isinstance(obj, Decimal):
+        return float(obj)
+    
+    # Handle dictionaries
+    if isinstance(obj, dict):
+        return {key: serialize_run(value) for key, value in obj.items()}
+    
+    # Handle lists/tuples
+    if isinstance(obj, (list, tuple)):
+        return [serialize_run(item) for item in obj]
+    
+    # Handle Pydantic models (Run objects)
+    if hasattr(obj, 'dict'):
+        return serialize_run(obj.dict())
+    
+    # Handle Pydantic v2 models
+    if hasattr(obj, 'model_dump'):
+        return serialize_run(obj.model_dump())
+    
+    # Handle other objects with __dict__
+    if hasattr(obj, '__dict__'):
+        return serialize_run(obj.__dict__)
+    
+    # Return primitive types as-is
+    return obj
 
 
-def export_trace(run, output_path):
-    """Export a single trace to JSON"""
-    try:
-        run_dict = {
-            "id": str(run.id),
-            "name": getattr(run, 'name', None),
-            "run_type": getattr(run, 'run_type', None),
-            "start_time": run.start_time.isoformat() if hasattr(run, 'start_time') and run.start_time else None,
-            "end_time": run.end_time.isoformat() if hasattr(run, 'end_time') and run.end_time else None,
-            "inputs": getattr(run, 'inputs', {}),
-            "outputs": getattr(run, 'outputs', {}),
-            "error": getattr(run, 'error', None),
-            "execution_order": getattr(run, 'execution_order', None),  
-            "serialized": getattr(run, 'serialized', {}),
-            "tags": getattr(run, 'tags', []),
-            "extra": getattr(run, 'extra', {}),
-            "trace_id": str(run.trace_id) if hasattr(run, 'trace_id') and run.trace_id else None,
-            "dotted_order": getattr(run, 'dotted_order', None),
-            "parent_run_id": str(run.parent_run_id) if hasattr(run, 'parent_run_id') and run.parent_run_id else None,
-            "child_run_ids": [str(cid) for cid in getattr(run, 'child_run_ids', None) or []],
-        }
+def fetch_run_with_children(client: Client, run_id: str, depth: int = 0, retry_count: int = 0) -> dict:
+    """Recursively fetch a run and all its children with rate limiting
+    
+    Args:
+        client: LangSmith client
+        run_id: UUID of the run to fetch
+        depth: Current recursion depth (for logging)
+        retry_count: Number of retries attempted
         
+    Returns:
+        Complete run dict with nested child_runs
+    """
+    indent = "  " * depth
+    
+    try:
+        print(f"{indent}Fetching run: {run_id[:8]}...")
+        
+        # Add delay to avoid rate limits (1 second between requests)
+        time.sleep(1.0)
+        
+        # Fetch this run
+        run = client.read_run(run_id)
+        
+        # Serialize to dict
+        run_dict = serialize_run(run)
+        
+        # If this run has children, fetch them recursively
+        if run_dict.get('child_run_ids'):
+            print(f"{indent}  → Found {len(run_dict['child_run_ids'])} child runs")
+            
+            child_runs = []
+            for child_id in run_dict['child_run_ids']:
+                try:
+                    child_run = fetch_run_with_children(client, child_id, depth + 1)
+                    child_runs.append(child_run)
+                except Exception as e:
+                    print(f"{indent}  ✗ Error fetching child {child_id[:8]}: {e}")
+                    # Continue with other children even if one fails
+            
+            # Replace null child_runs with actual data
+            run_dict['child_runs'] = child_runs
+            print(f"{indent}  ✓ Fetched {len(child_runs)} children")
+        
+        return run_dict
+        
+    except Exception as e:
+        # Check if it's a rate limit error
+        if "429" in str(e) or "too many requests" in str(e).lower():
+            if retry_count < 3:
+                wait_time = 30 * (retry_count + 1)  # 30s, 60s, 90s
+                print(f"{indent}⚠ Rate limited! Waiting {wait_time}s before retry...")
+                time.sleep(wait_time)
+                return fetch_run_with_children(client, run_id, depth, retry_count + 1)
+            else:
+                print(f"{indent}✗ Max retries exceeded for {run_id[:8]}")
+                raise
+        else:
+            raise
+
+
+def export_trace(trace_id: str, output_path: str) -> bool:
+    """Export a complete trace to JSON with all child runs
+    
+    Args:
+        trace_id: Full UUID or 8-char prefix of the trace
+        output_path: Path to save JSON file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        client = Client()
+        
+        print(f"\n{'='*60}")
+        print(f"Exporting trace: {trace_id}")
+        print(f"{'='*60}\n")
+        
+        # Recursively fetch the entire execution tree
+        run_dict = fetch_run_with_children(client, trace_id, depth=0)
+        
+        print(f"\n{'='*60}")
+        print(f"Converting to JSON...")
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+        
+        # Write to JSON file
         with open(output_path, 'w') as f:
             json.dump(run_dict, f, indent=2)
         
+        print(f"✓ Successfully exported to: {output_path}")
+        print(f"  File size: {os.path.getsize(output_path) / 1024:.1f} KB")
+        print(f"{'='*60}\n")
+        
         return True
+        
     except Exception as e:
-        print(f"      Error exporting: {e}")
+        print(f"\n{'='*60}")
+        print(f"✗ Error exporting trace: {e}")
+        print(f"{'='*60}\n")
+        import traceback
+        traceback.print_exc()
         return False
 
 
-def main():
-    """Main export function"""
+def export_all_traces(trace_mapping: dict, output_dir: str = "archived_traces") -> None:
+    """Export all traces from the mapping with resume capability
     
-    print("=" * 70)
-    print("LangSmith Trace Export for Agentic JWT Paper")
-    print("=" * 70)
-    print()
+    Args:
+        trace_mapping: Dict of {filename: full_trace_id}
+        output_dir: Directory to save JSON files
+    """
     
-    # Create output directory
-    output_dir = Path("experiments/traces")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    total = len(trace_mapping)
+    success = 0
+    failed = []
+    skipped = 0
     
-    print(f"Output directory: {output_dir.absolute()}")
-    print()
+    print(f"\nExporting {total} traces to {output_dir}/\n")
+    print(f"Rate limiting: 1 second delay between requests")
+    print(f"Resume: Will skip already-exported files\n")
     
-    # Track statistics
-    total_traces = len(THREAT_SCENARIOS) * 2  # OAuth + A-JWT for each threat
-    exported_count = 0
-    failed_traces = []
-    
-    # Export each threat scenario
-    for threat_id, threat_data in THREAT_SCENARIOS.items():
-        print(f"{threat_id}: {threat_data['name']}")
+    for i, (filename, trace_id) in enumerate(trace_mapping.items(), 1):
+        output_path = os.path.join(output_dir, filename)
         
-        # Export OAuth trace
-        oauth_prefix = threat_data['oauth_trace']
-        print(f"   OAuth trace: {oauth_prefix}", end=" ")
-        oauth_run = find_run_by_prefix(oauth_prefix, threat_id)
+        # Skip if already exported
+        if os.path.exists(output_path):
+            print(f"[{i}/{total}] {filename} - ALREADY EXISTS, skipping...")
+            skipped += 1
+            continue
         
-        if oauth_run:
-            oauth_path = output_dir / f"{threat_id}_{oauth_prefix}_oauth.json"
-            if export_trace(oauth_run, oauth_path):
-                print(f"Done")
-                exported_count += 1
-            else:
-                print(f"Failed")
-                failed_traces.append(f"{threat_id}_oauth_{oauth_prefix}")
+        print(f"[{i}/{total}] {filename}...")
+        
+        if export_trace(trace_id, output_path):
+            success += 1
         else:
-            print(f"Failed")
-            failed_traces.append(f"{threat_id}_oauth_{oauth_prefix}")
+            failed.append(filename)
         
-        # Export A-JWT trace
-        ajwt_prefix = threat_data['ajwt_trace']
-        print(f"   A-JWT trace: {ajwt_prefix}", end=" ")
-        ajwt_run = find_run_by_prefix(ajwt_prefix, threat_id)
-        
-        if ajwt_run:
-            ajwt_path = output_dir / f"{threat_id}_{ajwt_prefix}_ajwt.json"
-            if export_trace(ajwt_run, ajwt_path):
-                print(f"Done")
-                exported_count += 1
-            else:
-                print(f"Failed")
-                failed_traces.append(f"{threat_id}_ajwt_{ajwt_prefix}")
-        else:
-            print(f"Failed")
-            failed_traces.append(f"{threat_id}_ajwt_{ajwt_prefix}")
-        
-        print()
-    
-    # Create metadata file
-    metadata = {
-        "experiment_metadata": {
-            "paper_title": "Agentic JWT: A Secure Delegation Protocol for Autonomous AI Agents",
-            "author": "Abhishek Goswami",
-            "journal": "IEEE Access",
-            "arxiv_preprint": "2509.13597",
-            "patent_application": "US 19/315,486",
-            "export_date": datetime.now().isoformat(),
-            "langsmith_project": PROJECT_NAME,
-            "total_threat_scenarios": 12,
-            "traces_per_scenario": 2
-        },
-        "threat_scenarios": THREAT_SCENARIOS
-    }
-    
-    metadata_path = output_dir / "traces_metadata.json"
-    with open(metadata_path, 'w') as f:
-        json.dump(metadata, f, indent=2)
-    
-    print("Metadata file created: traces_metadata.json")
-    print()
+        print()  # Blank line between traces
     
     # Summary
-    print("=" * 70)
-    print("EXPORT SUMMARY")
-    print("=" * 70)
-    print(f"Successfully exported: {exported_count}/{total_traces} traces")
+    print("=" * 60)
+    print(f"Export complete:")
+    print(f"  Successfully exported: {success}/{total}")
+    print(f"  Skipped (already exist): {skipped}/{total}")
+    print(f"  Failed: {len(failed)}/{total}")
     
-    if failed_traces:
-        print(f"Failed exports: {len(failed_traces)}")
-        print("\nMissing traces:")
-        for trace in failed_traces:
-            print(f"   - {trace}")
-        print("\nTip: Check if these run names/IDs match in LangSmith UI")
+    if failed:
+        print(f"\nFailed traces:")
+        for name in failed:
+            print(f"  - {name}")
+        print(f"\nYou can re-run the script to retry failed traces")
     else:
-        print("All traces exported successfully!")
+        print("\n✓ All traces exported successfully!")
     
-    print()
-    print(f"All files saved to: {output_dir.absolute()}")
-    print()
+    print("=" * 60)
 
 
 if __name__ == "__main__":
-    main()
+    
+    # You'll need to get the FULL trace IDs from LangSmith
+    # Open each trace in browser and get the full UUID from the URL
+    
+    trace_mapping = {
+        # T1: Agent Identity Spoofing
+        "T01_41ac65e8_oauth.json": "41ac65e8-591a-42f9-b7cc-823f6094c2a1",
+        "T01_0ca33d76_ajwt.json": "0ca33d76-d66a-45ff-abfc-c50f3f3b3d66",
+        
+        # T2: Token Replay Attacks
+        "T02_8fd4713c_oauth.json": "8fd4713c-2204-4f9f-b619-6d1a49d2577c",
+        "T02_f7b8a5cf_ajwt.json": "f7b8a5cf-e637-4db0-a8a9-8e0476830f14",
+        
+        # T3: Shim Library Impersonation
+        "T03_9c1b5d1e_oauth.json": "9c1b5d1e-5639-423d-9a71-d2a56846fb01",
+        "T03_80805ddb_ajwt.json": "80805ddb-a50e-4f07-97b3-eb41b4e6ec3c",
+        
+        # T4: Runtime Code Modification
+        "T04_70174696_oauth.json": "70174696-8094-4c7e-9609-efec46409e9e",
+        "T04_48bdd65b_ajwt.json": "48bdd65b-bb57-4db0-a89e-e7c990bc3b2d",
+        
+        # T5: Prompt Injection Attacks
+        "T05_1be5a858_oauth.json": "1be5a858-04bc-46fc-abef-1e433a8afa0a",
+        "T05_f1062192_ajwt.json": "f1062192-a5ae-4802-b49b-eb967daf9a1d",
+        
+        # T6: Workflow Definition Tampering
+        "T06_5f14eabb_oauth.json": "5f14eabb-1684-4b70-a0ad-705ff369be8c",
+        "T06_0da6cf62_ajwt.json": "0da6cf62-603c-418a-b5ee-054de93b6fe5",
+        
+        # T7: Cross-Agent Privilege Escalation
+        "T07_6a04b024_oauth.json": "6a04b024-742a-417f-8ae1-13165189bc30",
+        "T07_44d2f82f_ajwt.json": "44d2f82f-567f-499a-ab0c-5e1b1ba4b7e2",
+        
+        # T8: Workflow Step Bypass
+        "T08_4c9613f7_oauth.json": "4c9613f7-6e9c-44ec-9fb8-78b12e5367d6",
+        "T08_eaa46e6f_ajwt.json": "eaa46e6f-48d7-49f5-92dc-dce3c740fe80",
+        
+        # T9: Scope Inflation
+        "T09_e352575c_oauth.json": "e352575c-e7cc-499f-9a9a-b8469c79834b",
+        "T09_44e0eaf1_ajwt.json": "44e0eaf1-20c8-4369-b1d1-8955d8215dee",
+        
+        # T10: Intent Origin Forgery
+        "T10_d7f79b4d_oauth.json": "d7f79b4d-f436-4b26-8486-498ec11b9cb1",
+        "T10_57e260f3_ajwt.json": "57e260f3-e9ea-4905-9f96-f54d10fb7b83",
+        
+        # T11: Delegation Chain Manipulation
+        "T11_2bedc0cf_oauth.json": "2bedc0cf-babe-4dad-8bca-ec4358dd71fa",
+        "T11_1f239b8d_ajwt.json": "1f239b8d-8323-4b45-ac66-1e538fa6a9ca",
+        
+        # T12: Agent Configuration Exposure
+        "T12_9a9f1440_oauth.json": "9a9f1440-9bce-47bb-9167-b0054e728891",
+        "T12_5a0af156_ajwt.json": "5a0af156-d495-4464-93b0-dc09fcfada16",
+    }
+    
+    # Export all traces
+    export_all_traces(trace_mapping, output_dir="archived_traces")
+    
+    print("\nNext steps:")
+    print("1. Upload JSON files to your GitHub repo: patchet/docs/archived_traces/")
+    print("2. Update traces.html to link to JSON files")
+    print("3. Create a simple JSON viewer (optional)")

@@ -29,3 +29,10 @@ WORKDIR /app/src
 ENV PYTHONPATH=/app/src
 COPY src/ /app/src/
 CMD ["uvicorn", "demo.endpoints:app", "--host", "0.0.0.0", "--port", "8087"]
+
+# ----- shimproxy -----
+FROM base AS shimproxy
+WORKDIR /app/src
+ENV PYTHONPATH=/app/src
+COPY src/ /app/src/
+CMD ["uvicorn", "shimproxy.main:app", "--host", "0.0.0.0", "--port", "8088"]

@@ -109,7 +109,8 @@ CLIENTS: Dict[str, Dict] = {
     "building_sensors": {
         "client_secret": "greentech123",
         "scopes": [
-            "read:sensors" "read:data",
+            "read:sensors",
+            "read:data",
             "read:agents",
         ],
         "audiences": ["api.localhost.building"],

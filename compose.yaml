@@ -44,6 +44,20 @@ services:
       - LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
     depends_on: [idp, api]
 
+  shimproxy:
+    build:
+      context: .
+      target: shimproxy
+    expose:
+      - 8088
+    environment:
+      - IDP_URL=http://idp:8085
+      - API_URL=http://api:8086
+      - APP_ID=patchet
+      - LANGSMITH_TRACING=false
+    depends_on: [idp, api]
+    restart: always
+
   caddy:
     image: caddy:2
     ports:
@@ -51,4 +65,4 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-    depends_on: [idp, api]
+    depends_on: [idp, api, shimproxy]

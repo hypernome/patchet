@@ -30,7 +30,7 @@ def normalize_prompt(prompt: str) -> str:
     lines = [line.strip() for line in normalized.split('\n')]
     normalized = '\n'.join(lines)
     
-    # 5. Remove empty lines (optional, depends on your needs)
+    # 5. Remove empty lines (optional)
     lines = [line for line in lines if line]
     normalized = '\n'.join(lines)
     
@@ -50,19 +50,19 @@ def _prepare_tool(tool: Tool) -> Dict:
 
 @traceable(name="compute_checksum")
 def compute_agent_checksum(agent_components: AgentComponents) -> str:
-        """
-        Compute deterministic checksum for agent
-        """
-        components = {
-            "id": agent_components.agent_id,
-            "prompt": normalize_prompt(agent_components.prompt_template),
-            "tools": sorted([
-                _prepare_tool(tool) for tool in agent_components.tools
-            ], key=lambda x: x["name"]),
-            "config": agent_components.configuration
-        }
-        content = json.dumps(components, sort_keys=True)
-        return hashlib.sha256(content.encode()).hexdigest()
+    """
+    Compute deterministic checksum for agent
+    """
+    components = {
+        "id": agent_components.agent_id,
+        "prompt": normalize_prompt(agent_components.prompt_template),
+        "tools": sorted([
+            _prepare_tool(tool) for tool in agent_components.tools
+        ], key=lambda x: x["name"]),
+        "config": agent_components.configuration
+    }
+    content = json.dumps(components, sort_keys=True)
+    return hashlib.sha256(content.encode()).hexdigest()
 
 def to_agent_components_1(agent_spec: AgentSpec) -> AgentComponents: 
     return AgentComponents(

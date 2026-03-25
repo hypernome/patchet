@@ -24,6 +24,6 @@ logs:
 	docker logs -f ${CONTAINER_NAME}
 
 refresh: clean-build
-	docker compose -f ./compose-rag.yaml up -d
+	docker compose -f ./compose.yaml up -d
 	make logs
 
