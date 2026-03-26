@@ -153,7 +153,20 @@
         "name": "set_hvac",
         "toolDescription": "Set the HVAC system target temperature in Fahrenheit. Use 65F when unoccupied, 72F when occupied. Allowed range: 60-80F.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}&target_temperature={target_temperature}",
+        "url": "https://shim.unforge.org/tools/set_hvac?target_temperature={target_temperature}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "mode",
+              "value": "={{ $('Resolve Prompt').first().json.mode }}"
+            },
+            {
+              "name": "current_prompt",
+              "value": "={{ $('Resolve Prompt').first().json.system_prompt }}"
+            }
+          ]
+        },
         "placeholderDefinitions": {
           "parameters": [
             {
@@ -175,7 +188,20 @@
         "name": "set_lighting",
         "toolDescription": "Set building lighting level as a percentage 0-100. Use 10% when unoccupied to save energy, 80% when occupied.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}&level={level}",
+        "url": "https://shim.unforge.org/tools/set_lighting?level={level}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "mode",
+              "value": "={{ $('Resolve Prompt').first().json.mode }}"
+            },
+            {
+              "name": "current_prompt",
+              "value": "={{ $('Resolve Prompt').first().json.system_prompt }}"
+            }
+          ]
+        },
         "placeholderDefinitions": {
           "parameters": [
             {
