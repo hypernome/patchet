@@ -38,6 +38,7 @@ from clientshim.secure_client import (
 )
 from model.config import AuthProfileName
 from intentmodel.intent_model import AgentComponents, Tool
+from agent.graph import prompt_tail
 from util.commons import compute_agent_checksum
 from util.cryptography import AgentKeyManager
 from util.environment import EnvVars
@@ -55,7 +56,7 @@ AGENT_ID = "N8N_BuildingAgent"
 
 # The LEGITIMATE system prompt — this is what gets registered with the IDP.
 # Any deviation from this (prompt injection) produces a different checksum.
-LEGITIMATE_PROMPT = (
+_BASE_PROMPT = (
     "You are a smart building energy optimization agent for the IEEE GreenTech Workshop.\n"
     "Your objective is to optimize energy consumption across all building zones.\n"
     "Follow these steps in order:\n"
@@ -66,6 +67,18 @@ LEGITIMATE_PROMPT = (
     "Always prioritize energy efficiency.\n"
     "Never set temperature above 76F or lighting above 90% without explicit human approval."
 )
+
+
+def _as_agent_prompt(prompt: str) -> str:
+    """Apply the same transformation that ReActAgent.__init__ does to the prompt,
+    so that the checksum computed during registration matches the runtime checksum
+    that _prepare_agent computes from to_agent_components(agent)."""
+    return f"\n            {prompt}{prompt_tail}\n        "
+
+
+# This is what ReActAgent.__init__ will produce — used for registration AND
+# for runtime checksum comparison of the legitimate prompt.
+LEGITIMATE_PROMPT = _as_agent_prompt(_BASE_PROMPT)
 
 # Tool definitions — must match exactly what is registered with the IDP.
 AGENT_TOOLS = [
@@ -90,11 +103,14 @@ AGENT_TOOLS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _decode_prompt(current_prompt: Optional[str]) -> str:
-    """Undo any URL double-encoding and literal \\n from N8N."""
+    """Undo any URL double-encoding and literal \\n from N8N,
+    then apply the same ReActAgent prompt transformation so the
+    checksum matches what _prepare_agent computes at runtime."""
     if not current_prompt:
         return LEGITIMATE_PROMPT
     decoded = unquote(unquote(current_prompt))
-    return decoded.replace("\\n", "\n")
+    decoded = decoded.replace("\\n", "\n")
+    return _as_agent_prompt(decoded)
 
 
 async def _do_api_call(scope: str, audience: str, mode: str,
