@@ -256,8 +256,13 @@ async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: 
                  then call API with returned token
     """
     api_url = os.getenv(EnvVars.API_URL.value, API_URL)
-    # Fall back to the registered legitimate prompt if N8N doesn't supply one
-    effective_prompt = current_prompt or LEGITIMATE_PROMPT
+    # Fall back to the registered legitimate prompt if N8N doesn't supply one.
+    # N8N expressions produce literal "\n" (two chars) instead of real newlines —
+    # normalise so the checksum matches the registered prompt.
+    if current_prompt:
+        effective_prompt = current_prompt.replace("\\n", "\n")
+    else:
+        effective_prompt = LEGITIMATE_PROMPT
 
     # Build query params (building API's /sensors endpoint requires agent_id)
     params = {"agent_id": AGENT_ID}
