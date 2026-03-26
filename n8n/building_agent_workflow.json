@@ -151,16 +151,14 @@
     {
       "parameters": {
         "name": "set_hvac",
-        "toolDescription": "Set the HVAC system target temperature in Fahrenheit. Use 65F when unoccupied, 72F when occupied. Allowed range: 60-80F. Requires: target_temperature (number).",
+        "toolDescription": "Set the HVAC system target temperature in Fahrenheit. Use 65F when unoccupied, 72F when occupied. Allowed range: 60-80F.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}",
-        "sendBody": true,
-        "specifyBody": "keypairs",
-        "bodyParameters": {
+        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}&target_temperature={target_temperature}",
+        "placeholderDefinitions": {
           "parameters": [
             {
               "name": "target_temperature",
-              "value": "={{ $fromAI('target_temperature', 'Target HVAC temperature in Fahrenheit between 60 and 80') }}"
+              "description": "Target HVAC temperature as a number in Fahrenheit, between 60 and 80. Example: 72"
             }
           ]
         }
@@ -175,16 +173,14 @@
     {
       "parameters": {
         "name": "set_lighting",
-        "toolDescription": "Set building lighting level as a percentage 0-100. Use 10% when unoccupied to save energy, 80% when occupied. Requires: level (integer).",
+        "toolDescription": "Set building lighting level as a percentage 0-100. Use 10% when unoccupied to save energy, 80% when occupied.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}",
-        "sendBody": true,
-        "specifyBody": "keypairs",
-        "bodyParameters": {
+        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}&level={level}",
+        "placeholderDefinitions": {
           "parameters": [
             {
               "name": "level",
-              "value": "={{ $fromAI('level', 'Lighting level as integer percentage from 0 to 100') }}"
+              "description": "Lighting level as an integer percentage from 0 to 100. Example: 80"
             }
           ]
         }
