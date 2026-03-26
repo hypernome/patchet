@@ -44,7 +44,7 @@ services:
       - LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
     depends_on: [idp, api]
 
-  shimproxy:
+  shim:
     build:
       context: .
       target: shim
