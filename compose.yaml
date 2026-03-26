@@ -52,12 +52,16 @@ services:
       target: shimproxy
     expose:
       - 8088
+    ports:
+      - "8088:8088"
     environment:
       - IDP_URL=http://idp:8085
       - API_URL=http://api:8086
       - APP_ID=patchet
       - LANGSMITH_TRACING=false
       - OPENAI_API_KEY=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
+    volumes:
+      - ./.runtime:/app/.runtime
     depends_on: [idp, api]
     restart: always
 
@@ -68,4 +72,10 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on: [idp, api, shim]
+
+volumes:
+  caddy_data:
+  caddy_config:
