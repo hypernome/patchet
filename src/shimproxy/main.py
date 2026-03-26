@@ -31,7 +31,7 @@ import httpx
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Optional
 from cryptography.hazmat.primitives import serialization
@@ -367,39 +367,60 @@ async def tool_read_history(
     )
 
 
-class SetHVACBody(BaseModel):
-    target_temperature: float
-
-
-class SetLightingBody(BaseModel):
-    level: int
+async def _extract_param(request: Request, name: str, cast=float):
+    """Extract a parameter from query string, JSON body, or form body."""
+    # 1. Query param
+    val = request.query_params.get(name)
+    if val:
+        return cast(val)
+    # 2. JSON body
+    try:
+        data = await request.json()
+        if name in data:
+            return cast(data[name])
+    except Exception:
+        pass
+    # 3. Form body
+    try:
+        form = await request.form()
+        if name in form:
+            return cast(form[name])
+    except Exception:
+        pass
+    return None
 
 
 @app.post("/tools/set_hvac")
 async def tool_set_hvac(
-    body: SetHVACBody,
+    request: Request,
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
+    target_temperature = await _extract_param(request, "target_temperature", float)
+    if target_temperature is None:
+        raise HTTPException(422, "target_temperature is required (query, JSON body, or form body)")
     return await _call(
         mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:hvac", audience="api.localhost.building",
         method="POST", path="/building/hvac/setpoint",
-        body={"agent_id": AGENT_ID, "target_temperature": body.target_temperature},
+        body={"agent_id": AGENT_ID, "target_temperature": target_temperature},
     )
 
 
 @app.post("/tools/set_lighting")
 async def tool_set_lighting(
-    body: SetLightingBody,
+    request: Request,
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
+    level = await _extract_param(request, "level", int)
+    if level is None:
+        raise HTTPException(422, "level is required (query, JSON body, or form body)")
     return await _call(
         mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:lighting", audience="api.localhost.building",
         method="POST", path="/building/lighting/level",
-        body={"agent_id": AGENT_ID, "level": body.level},
+        body={"agent_id": AGENT_ID, "level": level},
     )
 
 
