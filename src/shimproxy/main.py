@@ -301,26 +301,16 @@ async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: 
 
 
 # ── Tool endpoints ────────────────────────────────────────────────────────────
-# Each endpoint mirrors a tool function in the demo (e.g. demo/t5/tools.py):
-#   @secure_tool()
-#   async def t5_bump_versions():
-#       async with get_secure_client().authenticated_request(...) as http_client:
-#           response = await http_client.post(url=..., json=...)
-
-def _resolve(req_field: Optional[str], qp: Optional[str], default: str) -> str:
-    """Body field takes priority, then query param, then default."""
-    return req_field or qp or default
-
+# N8N sends mode & current_prompt as QUERY PARAMETERS in the URL.
+# Read endpoints have NO body. Write endpoints have body for tool-specific params only.
 
 @app.post("/tools/read_sensors")
 async def tool_read_sensors(
-    req: ToolRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="read:sensors", audience="api.localhost.building",
         method="GET", path="/building/sensors",
     )
@@ -328,13 +318,11 @@ async def tool_read_sensors(
 
 @app.post("/tools/read_temperature")
 async def tool_read_temperature(
-    req: ToolRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="read:sensors", audience="api.localhost.building",
         method="GET", path="/building/sensors/temperature",
     )
@@ -342,13 +330,11 @@ async def tool_read_temperature(
 
 @app.post("/tools/read_occupancy")
 async def tool_read_occupancy(
-    req: ToolRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="read:sensors", audience="api.localhost.building",
         method="GET", path="/building/sensors/occupancy",
     )
@@ -356,13 +342,11 @@ async def tool_read_occupancy(
 
 @app.post("/tools/read_energy")
 async def tool_read_energy(
-    req: ToolRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="read:data", audience="api.localhost.building",
         method="GET", path="/building/energy",
     )
@@ -370,13 +354,11 @@ async def tool_read_energy(
 
 @app.post("/tools/read_history")
 async def tool_read_history(
-    req: ToolRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="read:data", audience="api.localhost.building",
         method="GET", path="/building/history",
     )
@@ -384,31 +366,29 @@ async def tool_read_history(
 
 @app.post("/tools/set_hvac")
 async def tool_set_hvac(
-    req: HVACRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
+    target_temperature: float = Query(...),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:hvac", audience="api.localhost.building",
         method="POST", path="/building/hvac/setpoint",
-        body={"agent_id": AGENT_ID, "target_temperature": req.target_temperature},
+        body={"agent_id": AGENT_ID, "target_temperature": target_temperature},
     )
 
 
 @app.post("/tools/set_lighting")
 async def tool_set_lighting(
-    req: LightingRequest,
-    mode: Optional[str] = Query(default=None),
-    current_prompt: Optional[str] = Query(default=None),
+    mode: str = Query(default="oauth"),
+    current_prompt: str = Query(default=""),
+    level: int = Query(...),
 ):
     return await _call(
-        _resolve(req.mode, mode, "oauth"),
-        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
+        mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:lighting", audience="api.localhost.building",
         method="POST", path="/building/lighting/level",
-        body={"agent_id": AGENT_ID, "level": req.level},
+        body={"agent_id": AGENT_ID, "level": level},
     )
 
 
