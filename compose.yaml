@@ -6,7 +6,9 @@ services:
     expose: 
       - 8085
     environment:
-      - ISSUER=http://idp.localhost
+      - ISSUER=http://idp:8085
+      - IDP_URL=http://idp:8085
+      - EXPECTED_ISS=http://idp:8085
     volumes: 
       - ./.runtime:/app/.runtime
     restart: always
@@ -18,7 +20,7 @@ services:
     expose: 
       - 8086
     environment:
-      - EXPECTED_ISS=http://idp.localhost
+      - EXPECTED_ISS=http://idp:8085
       - IDP_URL=http://idp:8085
       - API_URL=http://api.localhost
       - EXPECTED_AUD="api.localhost.github,api.localhost.osv,api.localhost.building"

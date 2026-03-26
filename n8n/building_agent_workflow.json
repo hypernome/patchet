@@ -153,7 +153,17 @@
         "name": "set_hvac",
         "toolDescription": "Set the HVAC system target temperature in Fahrenheit. Use 65F when unoccupied, 72F when occupied. Allowed range: 60-80F. Requires: target_temperature (number).",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}&target_temperature={{ $fromAI('target_temperature', 'Target HVAC temperature in Fahrenheit between 60 and 80') }}"
+        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}",
+        "sendBody": true,
+        "specifyBody": "keypairs",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "target_temperature",
+              "value": "={{ $fromAI('target_temperature', 'Target HVAC temperature in Fahrenheit between 60 and 80') }}"
+            }
+          ]
+        }
       },
       "id": "11111111-0000-0000-0000-000000000009",
       "name": "set_hvac",
@@ -167,7 +177,17 @@
         "name": "set_lighting",
         "toolDescription": "Set building lighting level as a percentage 0-100. Use 10% when unoccupied to save energy, 80% when occupied. Requires: level (integer).",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}&level={{ $fromAI('level', 'Lighting level as integer percentage from 0 to 100') }}"
+        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}",
+        "sendBody": true,
+        "specifyBody": "keypairs",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "level",
+              "value": "={{ $fromAI('level', 'Lighting level as integer percentage from 0 to 100') }}"
+            }
+          ]
+        }
       },
       "id": "11111111-0000-0000-0000-000000000010",
       "name": "set_lighting",

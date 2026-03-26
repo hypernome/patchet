@@ -254,6 +254,9 @@ async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: 
     # Fall back to the registered legitimate prompt if N8N doesn't supply one
     effective_prompt = current_prompt or LEGITIMATE_PROMPT
 
+    # Build query params (building API's /sensors endpoint requires agent_id)
+    params = {"agent_id": AGENT_ID}
+
     if mode == "oauth":
         # ── OAuth path: exactly the same pattern as demo tools ─────────────
         try:
@@ -265,7 +268,7 @@ async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: 
                 workflow_enabled=False,
             ) as http_client:
                 if method == "GET":
-                    resp = await http_client.get(f"{api_url}{path}")
+                    resp = await http_client.get(f"{api_url}{path}", params=params)
                 else:
                     resp = await http_client.post(f"{api_url}{path}", json=body or {})
                 resp.raise_for_status()
@@ -285,7 +288,7 @@ async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: 
                 timeout=10,
             ) as http_client:
                 if method == "GET":
-                    resp = await http_client.get(f"{api_url}{path}")
+                    resp = await http_client.get(f"{api_url}{path}", params=params)
                 else:
                     resp = await http_client.post(f"{api_url}{path}", json=body or {})
                 resp.raise_for_status()
@@ -364,31 +367,39 @@ async def tool_read_history(
     )
 
 
+class SetHVACBody(BaseModel):
+    target_temperature: float
+
+
+class SetLightingBody(BaseModel):
+    level: int
+
+
 @app.post("/tools/set_hvac")
 async def tool_set_hvac(
+    body: SetHVACBody,
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
-    target_temperature: float = Query(...),
 ):
     return await _call(
         mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:hvac", audience="api.localhost.building",
         method="POST", path="/building/hvac/setpoint",
-        body={"agent_id": AGENT_ID, "target_temperature": target_temperature},
+        body={"agent_id": AGENT_ID, "target_temperature": body.target_temperature},
     )
 
 
 @app.post("/tools/set_lighting")
 async def tool_set_lighting(
+    body: SetLightingBody,
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
-    level: int = Query(...),
 ):
     return await _call(
         mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:lighting", audience="api.localhost.building",
         method="POST", path="/building/lighting/level",
-        body={"agent_id": AGENT_ID, "level": level},
+        body={"agent_id": AGENT_ID, "level": body.level},
     )
 
 
