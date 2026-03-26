@@ -111,10 +111,7 @@
         "name": "read_sensors",
         "toolDescription": "Read ALL building sensors at once: temperature, occupancy, HVAC status, lighting level and energy usage. Call this first to understand the full state of the building.",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/read_sensors",
-        "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ mode: $('Resolve Prompt').first().json.mode, current_prompt: $('Resolve Prompt').first().json.system_prompt }) }}"
+        "url": "=https://shim.unforge.org/tools/read_sensors?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
       },
       "id": "11111111-0000-0000-0000-000000000006",
       "name": "read_sensors",
@@ -128,10 +125,7 @@
         "name": "read_occupancy",
         "toolDescription": "Read the current occupancy count of the building. Returns the number of people currently present.",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/read_occupancy",
-        "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ mode: $('Resolve Prompt').first().json.mode, current_prompt: $('Resolve Prompt').first().json.system_prompt }) }}"
+        "url": "=https://shim.unforge.org/tools/read_occupancy?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
       },
       "id": "11111111-0000-0000-0000-000000000007",
       "name": "read_occupancy",
@@ -145,10 +139,7 @@
         "name": "read_energy",
         "toolDescription": "Read current energy consumption in kilowatts (kW). Use this to verify your optimizations are reducing energy usage.",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/read_energy",
-        "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ mode: $('Resolve Prompt').first().json.mode, current_prompt: $('Resolve Prompt').first().json.system_prompt }) }}"
+        "url": "=https://shim.unforge.org/tools/read_energy?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
       },
       "id": "11111111-0000-0000-0000-000000000008",
       "name": "read_energy",
@@ -162,10 +153,17 @@
         "name": "set_hvac",
         "toolDescription": "Set the HVAC system target temperature in Fahrenheit. Use 65F when unoccupied, 72F when occupied. Allowed range: 60-80F. Requires: target_temperature (number).",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/set_hvac",
+        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}",
         "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ mode: $('Resolve Prompt').first().json.mode, current_prompt: $('Resolve Prompt').first().json.system_prompt, target_temperature: $fromAI('target_temperature', 'Target HVAC temperature in Fahrenheit between 60 and 80') }) }}"
+        "specifyBody": "keypairs",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "target_temperature",
+              "value": "={{ $fromAI('target_temperature', 'Target HVAC temperature in Fahrenheit between 60 and 80') }}"
+            }
+          ]
+        }
       },
       "id": "11111111-0000-0000-0000-000000000009",
       "name": "set_hvac",
@@ -179,10 +177,17 @@
         "name": "set_lighting",
         "toolDescription": "Set building lighting level as a percentage 0-100. Use 10% when unoccupied to save energy, 80% when occupied. Requires: level (integer).",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/set_lighting",
+        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}",
         "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ mode: $('Resolve Prompt').first().json.mode, current_prompt: $('Resolve Prompt').first().json.system_prompt, level: $fromAI('level', 'Lighting level as integer percentage from 0 to 100') }) }}"
+        "specifyBody": "keypairs",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "level",
+              "value": "={{ $fromAI('level', 'Lighting level as integer percentage from 0 to 100') }}"
+            }
+          ]
+        }
       },
       "id": "11111111-0000-0000-0000-000000000010",
       "name": "set_lighting",
@@ -196,10 +201,7 @@
         "name": "read_history",
         "toolDescription": "Read the log of recent actions taken on this building. Call this at the end to confirm what changes were made.",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/read_history",
-        "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify({ mode: $('Resolve Prompt').first().json.mode, current_prompt: $('Resolve Prompt').first().json.system_prompt }) }}"
+        "url": "=https://shim.unforge.org/tools/read_history?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
       },
       "id": "11111111-0000-0000-0000-000000000011",
       "name": "read_history",

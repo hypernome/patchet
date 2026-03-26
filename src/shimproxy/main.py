@@ -31,8 +31,9 @@ import httpx
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
+from typing import Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -227,8 +228,8 @@ app = FastAPI(
 
 # ── Request models ────────────────────────────────────────────────────────────
 class ToolRequest(BaseModel):
-    mode: str           # "oauth" or "intent"
-    current_prompt: str # The prompt currently active in N8N
+    mode: Optional[str] = "oauth"              # "oauth" or "intent"
+    current_prompt: Optional[str] = None       # Falls back to LEGITIMATE_PROMPT if not provided
 
 
 class HVACRequest(ToolRequest):
@@ -240,7 +241,7 @@ class LightingRequest(ToolRequest):
 
 
 # ── Shared call helper ────────────────────────────────────────────────────────
-async def _call(mode: str, current_prompt: str, scope: str, audience: str,
+async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: str,
                 method: str, path: str, body: Optional[dict] = None) -> dict:
     """
     Unified dispatch:
@@ -250,6 +251,8 @@ async def _call(mode: str, current_prompt: str, scope: str, audience: str,
                  then call API with returned token
     """
     api_url = os.getenv(EnvVars.API_URL.value, API_URL)
+    # Fall back to the registered legitimate prompt if N8N doesn't supply one
+    effective_prompt = current_prompt or LEGITIMATE_PROMPT
 
     if mode == "oauth":
         # ── OAuth path: exactly the same pattern as demo tools ─────────────
@@ -275,7 +278,7 @@ async def _call(mode: str, current_prompt: str, scope: str, audience: str,
 
     elif mode == "intent":
         # ── Intent path: compute checksum → IDP validates → call API ───────
-        token = await _get_intent_token(current_prompt, scope, audience)
+        token = await _get_intent_token(effective_prompt, scope, audience)
         try:
             async with httpx.AsyncClient(
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -304,61 +307,90 @@ async def _call(mode: str, current_prompt: str, scope: str, audience: str,
 #       async with get_secure_client().authenticated_request(...) as http_client:
 #           response = await http_client.post(url=..., json=...)
 
+def _resolve(req_field: Optional[str], qp: Optional[str], default: str) -> str:
+    """Body field takes priority, then query param, then default."""
+    return req_field or qp or default
+
+
 @app.post("/tools/read_sensors")
-async def tool_read_sensors(req: ToolRequest):
-    """Read all building sensors. Maps to GET /building/sensors."""
+async def tool_read_sensors(
+    req: ToolRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="read:sensors", audience="api.localhost.building",
         method="GET", path="/building/sensors",
     )
 
 
 @app.post("/tools/read_temperature")
-async def tool_read_temperature(req: ToolRequest):
-    """Read temperature sensor. Maps to GET /building/sensors/temperature."""
+async def tool_read_temperature(
+    req: ToolRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="read:sensors", audience="api.localhost.building",
         method="GET", path="/building/sensors/temperature",
     )
 
 
 @app.post("/tools/read_occupancy")
-async def tool_read_occupancy(req: ToolRequest):
-    """Read occupancy sensor. Maps to GET /building/sensors/occupancy."""
+async def tool_read_occupancy(
+    req: ToolRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="read:sensors", audience="api.localhost.building",
         method="GET", path="/building/sensors/occupancy",
     )
 
 
 @app.post("/tools/read_energy")
-async def tool_read_energy(req: ToolRequest):
-    """Read energy usage. Maps to GET /building/energy."""
+async def tool_read_energy(
+    req: ToolRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="read:data", audience="api.localhost.building",
         method="GET", path="/building/energy",
     )
 
 
 @app.post("/tools/read_history")
-async def tool_read_history(req: ToolRequest):
-    """Read action history. Maps to GET /building/history."""
+async def tool_read_history(
+    req: ToolRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="read:data", audience="api.localhost.building",
         method="GET", path="/building/history",
     )
 
 
 @app.post("/tools/set_hvac")
-async def tool_set_hvac(req: HVACRequest):
-    """Set HVAC setpoint. Maps to POST /building/hvac/setpoint."""
+async def tool_set_hvac(
+    req: HVACRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="write:hvac", audience="api.localhost.building",
         method="POST", path="/building/hvac/setpoint",
         body={"agent_id": AGENT_ID, "target_temperature": req.target_temperature},
@@ -366,10 +398,14 @@ async def tool_set_hvac(req: HVACRequest):
 
 
 @app.post("/tools/set_lighting")
-async def tool_set_lighting(req: LightingRequest):
-    """Set lighting level. Maps to POST /building/lighting/level."""
+async def tool_set_lighting(
+    req: LightingRequest,
+    mode: Optional[str] = Query(default=None),
+    current_prompt: Optional[str] = Query(default=None),
+):
     return await _call(
-        req.mode, req.current_prompt,
+        _resolve(req.mode, mode, "oauth"),
+        _resolve(req.current_prompt, current_prompt, LEGITIMATE_PROMPT),
         scope="write:lighting", audience="api.localhost.building",
         method="POST", path="/building/lighting/level",
         body={"agent_id": AGENT_ID, "level": req.level},
