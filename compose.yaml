@@ -47,7 +47,7 @@ services:
   shim:
     build:
       context: .
-      target: shim
+      target: shimproxy
     expose:
       - 8088
     environment:
