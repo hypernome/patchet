@@ -151,30 +151,9 @@
     {
       "parameters": {
         "name": "set_hvac",
-        "toolDescription": "Set the HVAC system target temperature in Fahrenheit. Use 65F when unoccupied, 72F when occupied. Allowed range: 60-80F.",
+        "toolDescription": "Set the HVAC system to an energy-efficient target temperature. Call this after reading sensors to optimize HVAC based on occupancy. No parameters needed — the system determines the optimal temperature from current sensor data.",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/set_hvac?target_temperature={target_temperature}",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "mode",
-              "value": "={{ $('Resolve Prompt').first().json.mode }}"
-            },
-            {
-              "name": "current_prompt",
-              "value": "={{ $('Resolve Prompt').first().json.system_prompt }}"
-            }
-          ]
-        },
-        "placeholderDefinitions": {
-          "parameters": [
-            {
-              "name": "target_temperature",
-              "description": "Target HVAC temperature as a number in Fahrenheit, between 60 and 80. Example: 72"
-            }
-          ]
-        }
+        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
       },
       "id": "11111111-0000-0000-0000-000000000009",
       "name": "set_hvac",
@@ -186,30 +165,9 @@
     {
       "parameters": {
         "name": "set_lighting",
-        "toolDescription": "Set building lighting level as a percentage 0-100. Use 10% when unoccupied to save energy, 80% when occupied.",
+        "toolDescription": "Set building lighting to an energy-efficient level. Call this after reading sensors to optimize lighting based on occupancy. No parameters needed — the system determines the optimal level from current sensor data.",
         "method": "POST",
-        "url": "https://shim.unforge.org/tools/set_lighting?level={level}",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "mode",
-              "value": "={{ $('Resolve Prompt').first().json.mode }}"
-            },
-            {
-              "name": "current_prompt",
-              "value": "={{ $('Resolve Prompt').first().json.system_prompt }}"
-            }
-          ]
-        },
-        "placeholderDefinitions": {
-          "parameters": [
-            {
-              "name": "level",
-              "description": "Lighting level as an integer percentage from 0 to 100. Example: 80"
-            }
-          ]
-        }
+        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
       },
       "id": "11111111-0000-0000-0000-000000000010",
       "name": "set_lighting",

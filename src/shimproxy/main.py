@@ -31,9 +31,8 @@ import httpx
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -373,38 +372,30 @@ async def tool_read_history(
     )
 
 
-async def _extract_param(request: Request, name: str, cast=float):
-    """Extract a parameter from query string, JSON body, or form body."""
-    # 1. Query param
-    val = request.query_params.get(name)
-    if val:
-        return cast(val)
-    # 2. JSON body
+async def _get_occupancy(mode: str, current_prompt: str) -> int:
+    """Read current occupancy to determine smart defaults for HVAC/lighting."""
     try:
-        data = await request.json()
-        if name in data:
-            return cast(data[name])
-    except Exception:
-        pass
-    # 3. Form body
-    try:
-        form = await request.form()
-        if name in form:
-            return cast(form[name])
-    except Exception:
-        pass
-    return None
+        result = await _call(
+            mode, current_prompt,
+            scope="read:sensors", audience="api.localhost.building",
+            method="GET", path="/building/sensors/occupancy",
+        )
+        return int(result.get("occupancy", 0))
+    except Exception as e:
+        logger.warning("Failed to read occupancy for defaults: %s", e)
+        return 0  # assume unoccupied on error
 
 
 @app.post("/tools/set_hvac")
 async def tool_set_hvac(
-    request: Request,
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
+    target_temperature: Optional[float] = Query(default=None),
 ):
-    target_temperature = await _extract_param(request, "target_temperature", float)
     if target_temperature is None:
-        raise HTTPException(422, "target_temperature is required (query, JSON body, or form body)")
+        occupancy = await _get_occupancy(mode, current_prompt or LEGITIMATE_PROMPT)
+        target_temperature = 72.0 if occupancy > 0 else 65.0
+        logger.info("set_hvac: no value provided, using %sF (occupancy=%d)", target_temperature, occupancy)
     return await _call(
         mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:hvac", audience="api.localhost.building",
@@ -415,13 +406,14 @@ async def tool_set_hvac(
 
 @app.post("/tools/set_lighting")
 async def tool_set_lighting(
-    request: Request,
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
+    level: Optional[int] = Query(default=None),
 ):
-    level = await _extract_param(request, "level", int)
     if level is None:
-        raise HTTPException(422, "level is required (query, JSON body, or form body)")
+        occupancy = await _get_occupancy(mode, current_prompt or LEGITIMATE_PROMPT)
+        level = 80 if occupancy > 0 else 10
+        logger.info("set_lighting: no value provided, using %d%% (occupancy=%d)", level, occupancy)
     return await _call(
         mode, current_prompt or LEGITIMATE_PROMPT,
         scope="write:lighting", audience="api.localhost.building",

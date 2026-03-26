@@ -180,3 +180,6 @@ scratch/
 # runtimes
 .runtime/
 
+.claude/
+src/archived_traces/
+
