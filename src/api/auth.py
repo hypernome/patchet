@@ -187,23 +187,30 @@ async def verify_pop(request: Request, claims: Dict):
     """
     Check if PoP verification is enabled and verify PoP signature.
     """
-    if pop_required(claims): 
-        request_json: Dict = await request.json()
+    if pop_required(claims):
+        # For GET/HEAD requests there is no body; only parse JSON for other methods.
+        if request.method in ("GET", "HEAD", "DELETE"):
+            request_json = None
+        else:
+            try:
+                request_json = await request.json()
+            except Exception:
+                request_json = None
         pop_header = request.headers.get("PoP")
         pop_timestamp = request.headers.get("X-PoP-Timestamp")
         if not pop_header:
             raise HTTPException(401, "Missing PoP proof")
-        
+
         cnf_claim = claims.get("cnf", {})
         public_key_jwk = cnf_claim.get("jwk")
-        if not public_key_jwk: 
+        if not public_key_jwk:
             raise HTTPException(401, f"Token is missing jwk claim required for PoP verification.")
         pop_data = {
-            "method": "POST", 
-            "url": str(request.url), 
+            "method": request.method,
+            "url": str(request.url),
             "data": hashlib.sha256(json.dumps(request_json).encode()).hexdigest() if request_json else "",
             "checksum": claims.get("agent_proof").get("agent_checksum"),
-            "timestamp": int(pop_timestamp),             
+            "timestamp": int(pop_timestamp),
         }
         pop_message = json.dumps(pop_data, sort_keys=True).encode()
         public_key = jwk_to_public_key(public_key_jwk) 

@@ -139,13 +139,23 @@ async def _do_api_call(scope: str, audience: str, mode: str,
     if auth_mode == AuthMode.oauth:
         auth_kwargs["auth_profile_name"] = AuthProfileName.building_admin
 
-    # Build PoP data for intent+POST requests (verify_pop needs it)
-    if auth_mode == AuthMode.intent and method == "POST" and body:
-        auth_kwargs["pop_data"] = {
+    # Build PoP data for intent requests (verify_pop needs it for all methods).
+    # The URL must match what the API sees via str(request.url), including query params.
+    if auth_mode == AuthMode.intent:
+        if method == "GET" and params:
+            from urllib.parse import urlencode
+            pop_url = f"{api_url}{path}?{urlencode(params)}"
+        else:
+            pop_url = f"{api_url}{path}"
+        pop = {
             "method": method,
-            "url": f"{api_url}{path}",
-            "data": hashlib.sha256(json_mod.dumps(body).encode()).hexdigest(),
+            "url": pop_url,
         }
+        if method == "POST" and body:
+            pop["data"] = hashlib.sha256(json_mod.dumps(body).encode()).hexdigest()
+        else:
+            pop["data"] = ""
+        auth_kwargs["pop_data"] = pop
 
     async with get_secure_client().authenticated_request(
         scope, **auth_kwargs
