@@ -111,7 +111,7 @@
         "name": "read_sensors",
         "toolDescription": "Read ALL building sensors at once: temperature, occupancy, HVAC status, lighting level and energy usage. Call this first to understand the full state of the building.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/read_sensors?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
+        "url": "=https://shim.unforge.org/tools/read_sensors?mode={{ $('Resolve Prompt').first().json.mode }}&current_prompt={{ $('Resolve Prompt').first().json.system_prompt }}"
       },
       "id": "11111111-0000-0000-0000-000000000006",
       "name": "read_sensors",
@@ -125,7 +125,7 @@
         "name": "read_occupancy",
         "toolDescription": "Read the current occupancy count of the building. Returns the number of people currently present.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/read_occupancy?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
+        "url": "=https://shim.unforge.org/tools/read_occupancy?mode={{ $('Resolve Prompt').first().json.mode }}&current_prompt={{ $('Resolve Prompt').first().json.system_prompt }}"
       },
       "id": "11111111-0000-0000-0000-000000000007",
       "name": "read_occupancy",
@@ -139,7 +139,7 @@
         "name": "read_energy",
         "toolDescription": "Read current energy consumption in kilowatts (kW). Use this to verify your optimizations are reducing energy usage.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/read_energy?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
+        "url": "=https://shim.unforge.org/tools/read_energy?mode={{ $('Resolve Prompt').first().json.mode }}&current_prompt={{ $('Resolve Prompt').first().json.system_prompt }}"
       },
       "id": "11111111-0000-0000-0000-000000000008",
       "name": "read_energy",
@@ -153,7 +153,7 @@
         "name": "set_hvac",
         "toolDescription": "Set the HVAC system to an energy-efficient target temperature. Call this after reading sensors to optimize HVAC based on occupancy. No parameters needed — the system determines the optimal temperature from current sensor data.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
+        "url": "=https://shim.unforge.org/tools/set_hvac?mode={{ $('Resolve Prompt').first().json.mode }}&current_prompt={{ $('Resolve Prompt').first().json.system_prompt }}"
       },
       "id": "11111111-0000-0000-0000-000000000009",
       "name": "set_hvac",
@@ -167,7 +167,7 @@
         "name": "set_lighting",
         "toolDescription": "Set building lighting to an energy-efficient level. Call this after reading sensors to optimize lighting based on occupancy. No parameters needed — the system determines the optimal level from current sensor data.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
+        "url": "=https://shim.unforge.org/tools/set_lighting?mode={{ $('Resolve Prompt').first().json.mode }}&current_prompt={{ $('Resolve Prompt').first().json.system_prompt }}"
       },
       "id": "11111111-0000-0000-0000-000000000010",
       "name": "set_lighting",
@@ -181,7 +181,7 @@
         "name": "read_history",
         "toolDescription": "Read the log of recent actions taken on this building. Call this at the end to confirm what changes were made.",
         "method": "POST",
-        "url": "=https://shim.unforge.org/tools/read_history?mode={{ encodeURIComponent($('Resolve Prompt').first().json.mode) }}&current_prompt={{ encodeURIComponent($('Resolve Prompt').first().json.system_prompt) }}"
+        "url": "=https://shim.unforge.org/tools/read_history?mode={{ $('Resolve Prompt').first().json.mode }}&current_prompt={{ $('Resolve Prompt').first().json.system_prompt }}"
       },
       "id": "11111111-0000-0000-0000-000000000011",
       "name": "read_history",

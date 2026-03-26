@@ -26,6 +26,7 @@ the four demo runs is mode (oauth / intent) and current_prompt
 
 import logging
 import os
+from urllib.parse import unquote
 
 import httpx
 from contextlib import asynccontextmanager
@@ -257,10 +258,11 @@ async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: 
     """
     api_url = os.getenv(EnvVars.API_URL.value, API_URL)
     # Fall back to the registered legitimate prompt if N8N doesn't supply one.
-    # N8N expressions produce literal "\n" (two chars) instead of real newlines —
-    # normalise so the checksum matches the registered prompt.
+    # N8N double-URL-encodes query params in expression URLs, so we must
+    # fully URL-decode the incoming prompt before checksum computation.
     if current_prompt:
-        effective_prompt = current_prompt.replace("\\n", "\n")
+        decoded = unquote(unquote(current_prompt))  # handle double-encoding
+        effective_prompt = decoded.replace("\\n", "\n")
     else:
         effective_prompt = LEGITIMATE_PROMPT
 
