@@ -210,8 +210,14 @@ async def _get_intent_token(current_prompt: str, scope: str, audience: str) -> s
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _generate_keypair()
-    # Initialise SecureClient (same call used in demo/main_scenario.py)
-    await init_security(agent_specs=[], app_id=APP_ID, idp_url=IDP_URL)
+    # Initialise SecureClient — _register_agents_from_idp will fail because
+    # the shimproxy has no @secure_tool() functions in the registry, but the
+    # SecureClient itself IS initialised before that call, so get_secure_client()
+    # works fine for OAuth token minting afterwards.
+    try:
+        await init_security(agent_specs=[], app_id=APP_ID, idp_url=IDP_URL)
+    except Exception as exc:
+        logger.warning("init_security partially failed (expected — shimproxy has no tool registry): %s", exc)
     try:
         await _register_with_idp()
     except Exception as exc:
