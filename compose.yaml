@@ -57,6 +57,7 @@ services:
       - API_URL=http://api:8086
       - APP_ID=patchet
       - LANGSMITH_TRACING=false
+      - OPENAI_API_KEY=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
     depends_on: [idp, api]
     restart: always
 
