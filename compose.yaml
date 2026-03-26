@@ -65,4 +65,4 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-    depends_on: [idp, api, shimproxy]
+    depends_on: [idp, api, shim]
