@@ -1,51 +1,45 @@
 """
 ShimProxy — Client-side shim bridge for N8N building agent tools.
 
-Each /tools/* endpoint mirrors the exact pattern used in the demo threat
-tools (e.g. src/demo/t5/tools.py):
+Both OAuth and Intent mode use the clientshim library's
+authenticated_request() — exactly the same pattern as demo/t5/tools.py.
 
-  async with get_secure_client().authenticated_request(
-      "<scope>",
-      audience="...",
-      auth_profile_name=AuthProfileName.building_admin,
-      mode=AuthMode.oauth,          # ← oauth: no integrity check
-      workflow_enabled=False,
-  ) as http_client:
-      response = await http_client.get/post(...)
+For intent mode to work, the shimproxy:
+  1. Registers tool functions with @secure_tool() so _TOOL_REGISTRY is populated
+  2. Generates RSA keys via AgentKeyManager (same as the demo agents)
+  3. Registers the agent with the IDP (including public key for PoP)
+  4. Calls init_security() → _register_agents_from_idp() builds a ReActAgent
+     + AgentIdentity with the private key for PoP signing
+  5. Each tool endpoint delegates to its @secure_tool() function which calls
+     authenticated_request() — _detect_current_agent_context() walks the stack
+     and finds the registered tool function + the ReActAgent in gc
 
-For intent mode the clientshim library is still used — but the
-compute_agent_checksum() utility is called directly with current_prompt
-(just as _mint_intent_token does internally) so the IDP can compare
-the runtime checksum against the registered one.  When current_prompt
-has been injected the checksum will differ and the IDP returns 401.
-
-N8N tools call these endpoints.  The only thing that changes between
+N8N tools call these endpoints. The only thing that changes between
 the four demo runs is mode (oauth / intent) and current_prompt
 (legitimate / injected) — everything else stays identical.
 """
 
+import hashlib
+import json as json_mod
 import logging
 import os
 from urllib.parse import unquote
-
-import httpx
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 
 from clientshim.secure_client import (
     get_secure_client,
     init_security,
     secure_tool,
     AuthMode,
+    _current_agent_context,
 )
 from model.config import AuthProfileName
 from intentmodel.intent_model import AgentComponents, Tool
 from util.commons import compute_agent_checksum
+from util.cryptography import AgentKeyManager
 from util.environment import EnvVars
 
 logging.basicConfig(level=logging.INFO)
@@ -84,35 +78,159 @@ AGENT_TOOLS = [
     Tool(name="set_lighting",     signature="(level: int, agent_id: str) -> dict",               description="Set building lighting level as a percentage from 0 to 100."),
 ]
 
-# ── RSA key pair (generated at startup for agent PoP registration) ─────────────
-_private_key = None
-_public_key_pem: str = ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1.  @secure_tool() functions — these are the REAL tool implementations.
+#     They live in _TOOL_REGISTRY so _register_agents_from_idp() can build
+#     a ReActAgent.  They also appear on the call stack when
+#     _detect_current_agent_context() walks up looking for registered tools.
+#
+#     Signatures MUST match AGENT_TOOLS exactly because
+#     to_agent_components → get_core_signature inspects the real Python sig.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _decode_prompt(current_prompt: Optional[str]) -> str:
+    """Undo any URL double-encoding and literal \\n from N8N."""
+    if not current_prompt:
+        return LEGITIMATE_PROMPT
+    decoded = unquote(unquote(current_prompt))
+    return decoded.replace("\\n", "\n")
 
 
-def _generate_keypair():
-    global _private_key, _public_key_pem
-    _private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    _public_key_pem = (
-        _private_key.public_key()
-        .public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-        .decode()
+async def _do_api_call(scope: str, audience: str, mode: str,
+                       current_prompt: Optional[str],
+                       method: str, path: str,
+                       body: Optional[dict] = None) -> dict:
+    """
+    Core dispatch — called from WITHIN each @secure_tool() function
+    so that function is on the call stack when _detect_current_agent_context
+    walks up.
+    """
+    api_url = os.getenv(EnvVars.API_URL.value, API_URL)
+    params = {"agent_id": AGENT_ID}
+
+    auth_mode = AuthMode.intent if mode == "intent" else AuthMode.oauth
+
+    # For intent mode, set the ContextVar that _detect_current_agent_context reads
+    if auth_mode == AuthMode.intent:
+        _current_agent_context.set(AGENT_ID)
+
+    auth_kwargs = dict(
+        audience=audience,
+        mode=auth_mode,
+        workflow_enabled=False,
     )
-    logger.info("RSA key pair generated for %s", AGENT_ID)
+    if auth_mode == AuthMode.oauth:
+        auth_kwargs["auth_profile_name"] = AuthProfileName.building_admin
+
+    # Build PoP data for intent+POST requests (verify_pop needs it)
+    if auth_mode == AuthMode.intent and method == "POST" and body:
+        auth_kwargs["pop_data"] = {
+            "method": method,
+            "url": f"{api_url}{path}",
+            "data": hashlib.sha256(json_mod.dumps(body).encode()).hexdigest(),
+        }
+
+    async with get_secure_client().authenticated_request(
+        scope, **auth_kwargs
+    ) as http_client:
+        if method == "GET":
+            resp = await http_client.get(f"{api_url}{path}", params=params)
+        else:
+            resp = await http_client.post(f"{api_url}{path}", json=body or {})
+        resp.raise_for_status()
+        return resp.json()
 
 
-# ── Register N8N_BuildingAgent with IDP ───────────────────────────────────────
-async def _register_with_idp():
-    """
-    Register N8N_BuildingAgent with the IDP using the legitimate prompt.
-    Uses the same authenticated_request() pattern as the demo tools,
-    calling the intent_registration_admin OAuth profile.
-    """
+@secure_tool()
+async def read_sensors() -> dict:
+    """Read all building sensors including temperature, occupancy, HVAC and lighting"""
+    return await _do_api_call(
+        scope="read:sensors", audience="api.localhost.building",
+        mode=read_sensors._shim_mode, current_prompt=read_sensors._shim_prompt,
+        method="GET", path="/building/sensors",
+    )
+
+@secure_tool()
+async def read_temperature() -> dict:
+    """Read current temperature sensor data"""
+    return await _do_api_call(
+        scope="read:sensors", audience="api.localhost.building",
+        mode=read_temperature._shim_mode, current_prompt=read_temperature._shim_prompt,
+        method="GET", path="/building/sensors/temperature",
+    )
+
+@secure_tool()
+async def read_occupancy() -> dict:
+    """Read occupancy sensor data"""
+    return await _do_api_call(
+        scope="read:sensors", audience="api.localhost.building",
+        mode=read_occupancy._shim_mode, current_prompt=read_occupancy._shim_prompt,
+        method="GET", path="/building/sensors/occupancy",
+    )
+
+@secure_tool()
+async def read_energy() -> dict:
+    """Read current energy usage in kW"""
+    return await _do_api_call(
+        scope="read:data", audience="api.localhost.building",
+        mode=read_energy._shim_mode, current_prompt=read_energy._shim_prompt,
+        method="GET", path="/building/energy",
+    )
+
+@secure_tool()
+async def read_history() -> dict:
+    """Read action history log"""
+    return await _do_api_call(
+        scope="read:data", audience="api.localhost.building",
+        mode=read_history._shim_mode, current_prompt=read_history._shim_prompt,
+        method="GET", path="/building/history",
+    )
+
+@secure_tool()
+async def set_hvac(target_temperature: float, agent_id: str) -> dict:
+    """Set HVAC target temperature in Fahrenheit. Allowed range: 60-80F."""
+    return await _do_api_call(
+        scope="write:hvac", audience="api.localhost.building",
+        mode=set_hvac._shim_mode, current_prompt=set_hvac._shim_prompt,
+        method="POST", path="/building/hvac/setpoint",
+        body={"agent_id": agent_id, "target_temperature": target_temperature},
+    )
+
+@secure_tool()
+async def set_lighting(level: int, agent_id: str) -> dict:
+    """Set building lighting level as a percentage from 0 to 100."""
+    return await _do_api_call(
+        scope="write:lighting", audience="api.localhost.building",
+        mode=set_lighting._shim_mode, current_prompt=set_lighting._shim_prompt,
+        method="POST", path="/building/lighting/level",
+        body={"agent_id": agent_id, "level": level},
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2.  Key management — use AgentKeyManager so SecureClient finds the keys
+# ══════════════════════════════════════════════════════════════════════════════
+
+_key_manager = AgentKeyManager()
+
+
+def _ensure_agent_keys() -> str:
+    """Generate RSA key pair via AgentKeyManager, return public_key PEM."""
+    os.makedirs(_key_manager.key_home_dir, exist_ok=True)
+    public_key_pem = _key_manager.generate_keys_for_agent(AGENT_ID)
+    logger.info("RSA key pair ready for %s", AGENT_ID)
+    return public_key_pem
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3.  IDP registration
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def _register_with_idp(public_key_pem: str):
+    """Register N8N_BuildingAgent with the IDP including the PoP public key."""
     logger.info("Registering %s with IDP...", AGENT_ID)
 
-    # Mint registration token — same OAuth pattern as all demo tools
     async with get_secure_client().authenticated_request(
         "register:intent",
         audience="idp.localhost",
@@ -130,7 +248,7 @@ async def _register_with_idp():
             json={
                 "app_id":           APP_ID,
                 "agent_components": components.model_dump(),
-                "public_key":       _public_key_pem,
+                "public_key":       public_key_pem,
             },
         )
 
@@ -147,81 +265,40 @@ async def _register_with_idp():
     )
 
 
-# ── Intent token helper ───────────────────────────────────────────────────────
-async def _get_intent_token(current_prompt: str, scope: str, audience: str) -> str:
-    """
-    Compute checksum from current_prompt using compute_agent_checksum()
-    (the same utility the SecureClient uses internally in _mint_intent_token)
-    then call the IDP /intent/token endpoint.
+# ══════════════════════════════════════════════════════════════════════════════
+# 4.  Lifespan — orchestrate startup in the right order
+# ══════════════════════════════════════════════════════════════════════════════
 
-    If current_prompt ≠ registered prompt → checksum ≠ stored checksum
-    → IDP returns 401 → prompt injection detected.
-    """
-    components = AgentComponents(
-        agent_id=AGENT_ID,
-        prompt_template=current_prompt,
-        tools=AGENT_TOOLS,
-    )
-    computed_checksum = compute_agent_checksum(components)
-    logger.info("Intent checksum: %s...  scope=%s", computed_checksum[:16], scope)
-
-    # Use patchet OAuth profile to authorize the intent/token call —
-    # same pattern as authenticated_request() calls the IDP internally.
-    async with get_secure_client().authenticated_request(
-        "generate:intent-token",
-        audience="idp.localhost",
-        auth_profile_name=AuthProfileName.patchet,
-        mode=AuthMode.oauth,
-        workflow_enabled=False,
-    ) as patchet_client:
-        resp = await patchet_client.post(
-            f"{IDP_URL}/intent/token",
-            json={
-                "grant_type":        "agent_checksum",
-                "agent_id":          AGENT_ID,
-                "computed_checksum": computed_checksum,
-                "workflow_id":       "n8n-building-greentech",
-                "requested_scopes":  scope.split(),
-                "audience":          audience,
-                "workflow_enabled":  False,
-            },
-        )
-
-    if resp.status_code in (400, 401, 403):
-        logger.warning("PROMPT INJECTION DETECTED — IDP rejected checksum for %s", AGENT_ID)
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error":       "prompt_injection_detected",
-                "message":     (
-                    "Agent checksum mismatch — the effective prompt has been modified. "
-                    "Prompt injection attack detected and blocked by IDP."
-                ),
-                "agent_id":    AGENT_ID,
-                "idp_response": resp.json(),
-            },
-        )
-
-    resp.raise_for_status()
-    return resp.json()["access_token"]
-
-
-# ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _generate_keypair()
-    # Initialise SecureClient — _register_agents_from_idp will fail because
-    # the shimproxy has no @secure_tool() functions in the registry, but the
-    # SecureClient itself IS initialised before that call, so get_secure_client()
-    # works fine for OAuth token minting afterwards.
+    # Step A: generate keys BEFORE init_security (AgentKeyManager writes PEM
+    #         files that SecureClient._prepare_agent reads later).
+    public_key_pem = _ensure_agent_keys()
+
+    # Step B: first init_security just to create the SecureClient singleton.
+    #         _register_agents_from_idp may find 0 agents on first boot
+    #         (agent not yet registered with IDP) — that is fine.
     try:
         await init_security(agent_specs=[], app_id=APP_ID, idp_url=IDP_URL)
     except Exception as exc:
-        logger.warning("init_security partially failed (expected — shimproxy has no tool registry): %s", exc)
+        logger.warning("init_security first pass: %s", exc)
+
+    # Step C: register the agent with IDP (needs SecureClient for OAuth token)
     try:
-        await _register_with_idp()
+        await _register_with_idp(public_key_pem)
     except Exception as exc:
-        logger.warning("Agent registration failed at startup: %s", exc)
+        logger.warning("Agent registration failed: %s", exc)
+
+    # Step D: re-run _register_agents_from_idp now that the agent exists in
+    #         the IDP AND tool stubs are in _TOOL_REGISTRY AND keys are
+    #         available.  This builds the ReActAgent + AgentIdentity with
+    #         the private key needed for PoP.
+    try:
+        await get_secure_client()._register_agents_from_idp()
+        logger.info("Agent identity loaded — intent mode ready.")
+    except Exception as exc:
+        logger.warning("Loading agent identity failed: %s", exc)
+
     yield
 
 
@@ -232,103 +309,54 @@ app = FastAPI(
 )
 
 
-# ── Request models ────────────────────────────────────────────────────────────
-class ToolRequest(BaseModel):
-    mode: Optional[str] = "oauth"              # "oauth" or "intent"
-    current_prompt: Optional[str] = None       # Falls back to LEGITIMATE_PROMPT if not provided
+# ══════════════════════════════════════════════════════════════════════════════
+# 5.  Helper to invoke a @secure_tool from an HTTP endpoint
+# ══════════════════════════════════════════════════════════════════════════════
 
-
-class HVACRequest(ToolRequest):
-    target_temperature: float
-
-
-class LightingRequest(ToolRequest):
-    level: int
-
-
-# ── Shared call helper ────────────────────────────────────────────────────────
-async def _call(mode: str, current_prompt: Optional[str], scope: str, audience: str,
-                method: str, path: str, body: Optional[dict] = None) -> dict:
+async def _invoke_tool(tool_func, mode: str, current_prompt: Optional[str],
+                       **extra_kwargs) -> dict:
     """
-    Unified dispatch:
-      oauth  → get_secure_client().authenticated_request(mode=AuthMode.oauth)
-                 identical to t5/tools.py pattern
-      intent → compute_agent_checksum(current_prompt) → IDP intent/token
-                 then call API with returned token
+    Stash mode & prompt on the tool function object, then call it.
+    The tool function reads them back and delegates to _do_api_call.
+    This ensures the @secure_tool() function is on the call stack.
     """
-    api_url = os.getenv(EnvVars.API_URL.value, API_URL)
-    # Fall back to the registered legitimate prompt if N8N doesn't supply one.
-    # N8N double-URL-encodes query params in expression URLs, so we must
-    # fully URL-decode the incoming prompt before checksum computation.
-    if current_prompt:
-        decoded = unquote(unquote(current_prompt))  # handle double-encoding
-        effective_prompt = decoded.replace("\\n", "\n")
-    else:
-        effective_prompt = LEGITIMATE_PROMPT
+    effective_prompt = _decode_prompt(current_prompt)
+    tool_func._shim_mode = mode
+    tool_func._shim_prompt = effective_prompt
 
-    # Build query params (building API's /sensors endpoint requires agent_id)
-    params = {"agent_id": AGENT_ID}
-
-    if mode == "oauth":
-        # ── OAuth path: exactly the same pattern as demo tools ─────────────
-        try:
-            async with get_secure_client().authenticated_request(
-                scope,
-                audience=audience,
-                auth_profile_name=AuthProfileName.building_admin,
-                mode=AuthMode.oauth,
-                workflow_enabled=False,
-            ) as http_client:
-                if method == "GET":
-                    resp = await http_client.get(f"{api_url}{path}", params=params)
-                else:
-                    resp = await http_client.post(f"{api_url}{path}", json=body or {})
-                resp.raise_for_status()
-                return resp.json()
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error("OAuth tool call failed: %s", e)
-            raise HTTPException(500, str(e))
-
-    elif mode == "intent":
-        # ── Intent path: compute checksum → IDP validates → call API ───────
-        token = await _get_intent_token(effective_prompt, scope, audience)
-        try:
-            async with httpx.AsyncClient(
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                timeout=10,
-            ) as http_client:
-                if method == "GET":
-                    resp = await http_client.get(f"{api_url}{path}", params=params)
-                else:
-                    resp = await http_client.post(f"{api_url}{path}", json=body or {})
-                resp.raise_for_status()
-                return resp.json()
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error("Intent tool call failed: %s", e)
-            raise HTTPException(500, str(e))
-
-    else:
-        raise HTTPException(400, f"Unknown mode '{mode}'. Use 'oauth' or 'intent'.")
+    try:
+        return await tool_func(**extra_kwargs)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        if "401" in error_msg or "checksum" in error_msg.lower():
+            logger.warning("PROMPT INJECTION DETECTED — IDP rejected checksum for %s", AGENT_ID)
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "prompt_injection_detected",
+                    "message": (
+                        "Agent checksum mismatch — the effective prompt has been modified. "
+                        "Prompt injection attack detected and blocked by IDP."
+                    ),
+                    "agent_id": AGENT_ID,
+                },
+            )
+        logger.error("%s tool call failed: %s", mode, e)
+        raise HTTPException(500, str(e))
 
 
-# ── Tool endpoints ────────────────────────────────────────────────────────────
-# N8N sends mode & current_prompt as QUERY PARAMETERS in the URL.
-# Read endpoints have NO body. Write endpoints have body for tool-specific params only.
+# ══════════════════════════════════════════════════════════════════════════════
+# 6.  HTTP endpoints — N8N calls these via toolHttpRequest
+# ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/tools/read_sensors")
 async def tool_read_sensors(
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="read:sensors", audience="api.localhost.building",
-        method="GET", path="/building/sensors",
-    )
+    return await _invoke_tool(read_sensors, mode, current_prompt or None)
 
 
 @app.post("/tools/read_temperature")
@@ -336,11 +364,7 @@ async def tool_read_temperature(
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="read:sensors", audience="api.localhost.building",
-        method="GET", path="/building/sensors/temperature",
-    )
+    return await _invoke_tool(read_temperature, mode, current_prompt or None)
 
 
 @app.post("/tools/read_occupancy")
@@ -348,11 +372,7 @@ async def tool_read_occupancy(
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="read:sensors", audience="api.localhost.building",
-        method="GET", path="/building/sensors/occupancy",
-    )
+    return await _invoke_tool(read_occupancy, mode, current_prompt or None)
 
 
 @app.post("/tools/read_energy")
@@ -360,11 +380,7 @@ async def tool_read_energy(
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="read:data", audience="api.localhost.building",
-        method="GET", path="/building/energy",
-    )
+    return await _invoke_tool(read_energy, mode, current_prompt or None)
 
 
 @app.post("/tools/read_history")
@@ -372,25 +388,7 @@ async def tool_read_history(
     mode: str = Query(default="oauth"),
     current_prompt: str = Query(default=""),
 ):
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="read:data", audience="api.localhost.building",
-        method="GET", path="/building/history",
-    )
-
-
-async def _get_occupancy(mode: str, current_prompt: str) -> int:
-    """Read current occupancy to determine smart defaults for HVAC/lighting."""
-    try:
-        result = await _call(
-            mode, current_prompt,
-            scope="read:sensors", audience="api.localhost.building",
-            method="GET", path="/building/sensors/occupancy",
-        )
-        return int(result.get("occupancy", 0))
-    except Exception as e:
-        logger.warning("Failed to read occupancy for defaults: %s", e)
-        return 0  # assume unoccupied on error
+    return await _invoke_tool(read_history, mode, current_prompt or None)
 
 
 @app.post("/tools/set_hvac")
@@ -400,14 +398,16 @@ async def tool_set_hvac(
     target_temperature: Optional[float] = Query(default=None),
 ):
     if target_temperature is None:
-        occupancy = await _get_occupancy(mode, current_prompt or LEGITIMATE_PROMPT)
+        try:
+            result = await _invoke_tool(read_occupancy, mode, current_prompt or None)
+            occupancy = int(result.get("occupancy", 0))
+        except Exception:
+            occupancy = 0
         target_temperature = 72.0 if occupancy > 0 else 65.0
         logger.info("set_hvac: no value provided, using %sF (occupancy=%d)", target_temperature, occupancy)
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="write:hvac", audience="api.localhost.building",
-        method="POST", path="/building/hvac/setpoint",
-        body={"agent_id": AGENT_ID, "target_temperature": target_temperature},
+    return await _invoke_tool(
+        set_hvac, mode, current_prompt or None,
+        target_temperature=target_temperature, agent_id=AGENT_ID,
     )
 
 
@@ -418,14 +418,16 @@ async def tool_set_lighting(
     level: Optional[int] = Query(default=None),
 ):
     if level is None:
-        occupancy = await _get_occupancy(mode, current_prompt or LEGITIMATE_PROMPT)
+        try:
+            result = await _invoke_tool(read_occupancy, mode, current_prompt or None)
+            occupancy = int(result.get("occupancy", 0))
+        except Exception:
+            occupancy = 0
         level = 80 if occupancy > 0 else 10
         logger.info("set_lighting: no value provided, using %d%% (occupancy=%d)", level, occupancy)
-    return await _call(
-        mode, current_prompt or LEGITIMATE_PROMPT,
-        scope="write:lighting", audience="api.localhost.building",
-        method="POST", path="/building/lighting/level",
-        body={"agent_id": AGENT_ID, "level": level},
+    return await _invoke_tool(
+        set_lighting, mode, current_prompt or None,
+        level=level, agent_id=AGENT_ID,
     )
 
 
@@ -439,7 +441,8 @@ def health():
 async def reset():
     """Re-register the agent with the IDP. Call between demo runs."""
     try:
-        await _register_with_idp()
+        public_key_pem = _key_manager.agent_keys.get(AGENT_ID, {}).get("public_key_pem", "")
+        await _register_with_idp(public_key_pem)
         return {"status": "re-registered", "agent_id": AGENT_ID}
     except Exception as exc:
         raise HTTPException(500, str(exc))
