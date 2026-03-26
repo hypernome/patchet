@@ -28,5 +28,5 @@ api.unforge.org {
 
 shim.unforge.org {
     encode gzip
-    reverse_proxy shimproxy:8088
+    reverse_proxy shim:8088
 }
