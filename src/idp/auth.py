@@ -72,18 +72,29 @@ class JWTSignatureMiddleware(BaseHTTPMiddleware):
         self.algorithms = algorithms or ["RS256"]
         self.clock_skew = clock_skew_seconds
         self.exempt = set(exempt_paths or [
-            "/health", 
-            "/docs", 
-            "/openapi.json", 
-            "/oauth/token", 
-            "/oauth/.well-known/jwks.json", 
+            "/health",
+            "/docs",
+            "/openapi.json",
+            "/oauth/token",
+            "/oauth/.well-known/jwks.json",
             "/oauth/.well-known/openid-configuration",
-            "/oauth/introspect", 
-            "/oauth/whoami"
+            "/oauth/introspect",
+            "/oauth/whoami",
+            # Root-level OIDC/OAuth discovery — MUST be public per spec so any
+            # verifier/client can fetch JWKS to validate tokens without auth.
+            "/.well-known/jwks.json",
+            "/.well-known/openid-configuration",
         ])
         self.jwks = _JWKSCache(jwks_url, ttl_seconds=int(os.getenv("JWKS_TTL", "600")))
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        # CORS preflight requests (OPTIONS) carry no credentials by design and
+        # must never be rejected by auth. Pass them straight through so the
+        # CORS middleware can answer the preflight. Defense-in-depth alongside
+        # CORS being installed as the outermost middleware in idp.py.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         if path in self.exempt or any(path.startswith(p + "/") for p in self.exempt):
             return await call_next(request)

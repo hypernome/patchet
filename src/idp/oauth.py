@@ -207,6 +207,28 @@ def jwks():
     return JSONResponse(JWKS)
 
 
+# ── Root-level discovery aliases (public, no auth) ─────────────────────────
+# OIDC/OAuth discovery is conventionally served at the ISSUER ROOT:
+#   {issuer}/.well-known/jwks.json
+#   {issuer}/.well-known/openid-configuration
+# External verifiers, resource servers, and client libraries fetch JWKS from
+# the root well-known path to verify our tokens — they cannot guess a /oauth
+# prefix. These aliases serve the same content as the /oauth/.well-known/*
+# routes above. Kept additive: the /oauth/.well-known/* paths still work, so
+# the in-process JWKS cache and the api resource server are unaffected.
+discovery_router = APIRouter()
+
+
+@discovery_router.get("/.well-known/jwks.json")
+def root_jwks():
+    return JSONResponse(JWKS)
+
+
+@discovery_router.get("/.well-known/openid-configuration")
+def root_openid_configuration():
+    return JSONResponse(JWKS)
+
+
 @oauth_router.post("/token", response_model=TokenResponse)
 def token(
     grant_type: str = Form(...),
