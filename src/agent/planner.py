@@ -1,6 +1,6 @@
 from state.state import Repo, Ecosystem, VulnAnalysisRequest, VulnAnalysisSpec, SbomTarget, PatchetState, PackageUpgrade, PatchPlan, CURRENT_STATE
 from model.types import SBOMQuery
-from langchain.tools import StructuredTool
+from langchain_core.tools import StructuredTool
 from langsmith import traceable
 from agent.graph import ReActAgent, StrcturedAgent, ToolSpec
 from api.github import list_files as lf

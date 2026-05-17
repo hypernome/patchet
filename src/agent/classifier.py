@@ -1,6 +1,6 @@
 from agent.graph import ReActAgent, ToolSpec
 from state.state import PatchetState, Ecosystem
-from langchain.tools import StructuredTool
+from langchain_core.tools import StructuredTool
 from langsmith import traceable
 from pathlib import PurePosixPath as P
 from collections import defaultdict

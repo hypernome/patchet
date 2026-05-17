@@ -1,4 +1,4 @@
-from langchain.tools import StructuredTool, Tool
+from langchain_core.tools import StructuredTool, Tool
 from agent.planner import Planner
 from agent.classifier import Classifier
 from agent.patcher import Patcher

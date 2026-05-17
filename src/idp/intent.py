@@ -134,7 +134,11 @@ class IntentServer:
         agent_checksum = compute_agent_checksum(components)
         registration_id = f"reg_{components.agent_id}_{int(time.time())}"
 
-        # Check for duplicate checksums (impersonation attempt)
+        # Check for duplicate checksums (impersonation attempt). This is the
+        # A2 (Registration-First) enforcement: two registrations may not share
+        # the same checksum, regardless of agent_id. T1 exercises exactly this
+        # — two dicts both claiming agent_id "T1Planner" with identical code
+        # produce identical checksums, and IDP must refuse the second one.
         for registrations in registered_agents.values():
             for registration in registrations:
                 if registration.checksum == agent_checksum:

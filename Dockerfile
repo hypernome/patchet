@@ -27,6 +27,9 @@ CMD ["uvicorn", "api.endpoints:app", "--host", "0.0.0.0", "--port", "8086"]
 FROM base AS runner
 WORKDIR /app/src
 ENV PYTHONPATH=/app/src
+# Agent registration writes PoP private keys to ../.runtime relative to /app/src.
+# Directory must exist before /register_all_agents is called.
+RUN mkdir -p /app/.runtime
 COPY src/ /app/src/
 CMD ["uvicorn", "demo.endpoints:app", "--host", "0.0.0.0", "--port", "8087"]
 

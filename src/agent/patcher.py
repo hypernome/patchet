@@ -1,7 +1,7 @@
 from state.state import Repo, RepoEvent, PatchetState, PatchPlan, PatchRequest, PatchResult, PatchStatus, CURRENT_STATE
 from util.constants import Constants
 from langsmith import traceable
-from langchain.tools import StructuredTool
+from langchain_core.tools import StructuredTool
 from agent.graph import ReActAgent, BootstrapTool, ToolSpec
 from clientshim.secure_model import AgentSpec
 from intentmodel.intent_model import AgentComponents, Tool

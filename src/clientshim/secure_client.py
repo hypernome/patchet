@@ -180,6 +180,17 @@ class SecureClient:
         logger.info(f"Cleaned up workflow: {workflow_id}")
 
     async def restart(self):
+        # Clear all per-agent caches so the upcoming re-prep starts clean.
+        # Without this, tool_to_agent.append() leaves stale AgentIdentity
+        # entries from the prior pass — which often have private_key=None
+        # (set when init_security ran before any registration) — and
+        # _detect_current_agent_context can return one of those stale
+        # identities, causing 'NoneType has no attribute sign' on PoP signing.
+        self.bridge_to_agent.clear()
+        self.tool_to_agent.clear()
+        self.registered_checksums.clear()
+        self.registered_agent_ids.clear()
+        self.verified_agents.clear()
         await self._register_agents_from_idp()
 
     def get_agent(self, agent_id: str) -> ReActAgent:
@@ -490,7 +501,15 @@ class SecureClient:
             raise SecurityError(f"Agent not properly registered with IDP")
 
         if agent_id in self.verified_agents:
-            raise SecurityError(f"Duplicate agent_id in registration: {agent_id}")
+            # Idempotent re-prep: this path is hit when restart() / register
+            # are called on a process whose verified_agents was already
+            # populated at startup (e.g. ECS task replaced after a previous
+            # registration). Treat the duplicate as a refresh — let the rest
+            # of this method overwrite the existing entry rather than failing
+            # the whole batch.
+            logger.debug(
+                f"Re-preparing already-verified agent '{agent_id}' (refresh path)"
+            )
 
         tools: list[Dict] = agent_registration.get("tools", [])
         if not tools:
@@ -565,18 +584,27 @@ class SecureClient:
         # Check for checksum collisions
         if computed_checksum in self.registered_checksums:
             existing_agent = self.registered_checksums[computed_checksum]
-            raise SecurityError(
-                f"Checksum collision: agent '{agent_id}' has same checksum as '{existing_agent}'"
-            )
+            # Re-prep of the same agent (same id, same checksum) is fine —
+            # only flag as a collision when two distinct agent_ids hash to
+            # the same checksum.
+            if existing_agent != agent_id:
+                raise SecurityError(
+                    f"Checksum collision: agent '{agent_id}' has same checksum as '{existing_agent}'"
+                )
 
         public_key_from_idp: str = agent_registration.get("public_key", None)
 
         # Check the existence of valid pop private key for this agent.
+        # On a cold start (e.g. ECS task replaced after registration), the
+        # ephemeral .runtime/ directory is empty, so agent_keys won't contain
+        # this agent_id even though IDP has its public key. We default the
+        # local variable to None so the AgentIdentity below can still be
+        # constructed; the PoP-key signature path will simply not be available
+        # for these agents until they are re-registered against this container.
+        current_agent_private_key: RSAPrivateKey | None = None
         agent_keys = self.agent_key_manager.agent_keys
-        if agent_keys:
-            current_agent_private_key: RSAPrivateKey = agent_keys[agent_id][
-                "private_key"
-            ]
+        if agent_keys and agent_id in agent_keys:
+            current_agent_private_key = agent_keys[agent_id].get("private_key")
             if current_agent_private_key:
                 public_key: RSAPublicKey = current_agent_private_key.public_key()
                 public_pem = public_key.public_bytes(
