@@ -20,7 +20,7 @@ aiohttp = "*"
 aiodns = "*"
 brotli = "*"
 cvss = "*"
-python-jose = "*"
+python-jose = {extras = ["cryptography"], version = "*"}
 python-multipart = "*"
 langchain-anthropic = "*"
 
