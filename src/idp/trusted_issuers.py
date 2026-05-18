@@ -24,7 +24,7 @@ class TrustedIssuer:
 TRUSTED_ISSUERS: Dict[str, TrustedIssuer] = {
     "https://auth51.com": TrustedIssuer(
         issuer="https://auth51.com",
-        jwks_uri="https://auth51.com/api/jwks.json",
+        jwks_uri="https://www.auth51.com/api/jwks.json",
         expected_audience="idp.localhost",  # Authority's own audience
         default_scopes=[
             "read:agents",

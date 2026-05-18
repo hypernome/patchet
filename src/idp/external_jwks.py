@@ -17,7 +17,7 @@ async def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
     cached = _cache.get(jwks_uri)
     if cached and cached[0] > time.time():
         return cached[1]
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
         res = await client.get(jwks_uri)
         res.raise_for_status()
         keys = res.json()
