@@ -7,8 +7,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from jose import jwt
 from jose.utils import base64url_encode
+from jose.exceptions import JWTError
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from idp.trusted_issuers import TRUSTED_ISSUERS
+from idp.external_jwks import fetch_jwks
+
+TOKEN_EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange"
 
 ISSUER = os.getenv("ISSUER")
 if not ISSUER:
@@ -230,13 +235,23 @@ def root_openid_configuration():
 
 
 @oauth_router.post("/token", response_model=TokenResponse)
-def token(
+async def token(
     grant_type: str = Form(...),
     client_id: str = Form(...),
     client_secret: str = Form(...),
+    subject_token: str = Form(default=None),
+    subject_token_type: str = Form(default=None),
     scope: str = Form(default=""),
     audience: str = Form(default=""),  # space-delimited
 ):
+    if grant_type == TOKEN_EXCHANGE_GRANT:
+        return await _handle_token_exchange(
+            subject_token=subject_token,
+            subject_token_type=subject_token_type,
+            audience=audience,
+            scope=scope,
+        )
+
     if grant_type != "client_credentials":
         raise HTTPException(400, "unsupported_grant_type")
 
@@ -271,6 +286,110 @@ def token(
     return TokenResponse(
         access_token=token, expires_in=30, scope=" ".join(requested_scopes)
     )
+
+
+async def _handle_token_exchange(
+    subject_token: str,
+    subject_token_type: str,
+    audience: str,
+    scope: str,
+):
+    if not subject_token:
+        raise HTTPException(400, "missing subject_token")
+    if (
+        subject_token_type
+        and subject_token_type != "urn:ietf:params:oauth:token-type:jwt"
+    ):
+        raise HTTPException(400, "unsupported subject_token_type")
+
+    # Decode header to find the issuer (peek at claims without verifying yet)
+    try:
+        unverified = jwt.get_unverified_claims(subject_token)
+    except JWTError:
+        raise HTTPException(400, "malformed subject_token")
+
+    issuer = unverified.get("iss")
+    if not issuer or issuer not in TRUSTED_ISSUERS:
+        raise HTTPException(401, f"untrusted issuer: {issuer}")
+
+    trusted = TRUSTED_ISSUERS[issuer]
+    # Fetch the issuer's public keys and verify the JWT
+    jwks = await fetch_jwks(trusted.jwks_uri)
+    try:
+        claims = jwt.decode(
+            subject_token,
+            key=jwks,
+            algorithms=["EdDSA", "RS256", "ES256"],
+            audience=trusted.expected_audience,
+            issuer=trusted.issuer,
+        )
+    except JWTError as e:
+        raise HTTPException(401, f"subject_token verification failed: {e}")
+
+    # Extract user identity for audit + role mapping
+    user_sub = claims.get("sub")
+    user_email = claims.get("email")
+    if not user_sub:
+        raise HTTPException(400, "subject_token missing sub claim")
+
+    # Determine granted scopes + audiences
+    requested_scopes = [s for s in scope.split() if s] or trusted.default_scopes
+    granted_scopes = [s for s in requested_scopes if s in trusted.default_scopes]
+    if not granted_scopes:
+        raise HTTPException(403, "no requested scopes are permitted for this issuer")
+
+    requested_audiences = [
+        a for a in audience.split() if a
+    ] or trusted.default_authority_audiences
+    granted_audiences = [
+        a for a in requested_audiences if a in trusted.default_authority_audiences
+    ]
+    if not granted_audiences:
+        raise HTTPException(403, "no requested audiences are permitted for this issuer")
+
+    # Mint our own access token bound to the federated user
+    access_token = _mint_internal_token(
+        sub=f"federated:{issuer}:{user_sub}",
+        email=user_email,
+        scopes=granted_scopes,
+        audiences=granted_audiences,
+        federated_issuer=issuer,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        token_type="Bearer",
+        expires_in=1800,
+        scope=" ".join(granted_scopes),
+    )
+
+
+def _mint_internal_token(sub, email, scopes, audiences, federated_issuer):
+    """
+    Mint an Authority access token bound to a federated user.
+
+    Signed identically to issue_jwt() — same python-jose encoder, same RSA
+    private key (priv_pem), same algorithm (ALG) and key id (KID), same
+    issuer (ISSUER) — so these tokens verify against the IDP's published
+    JWKS exactly like client_credentials tokens do.
+
+    Extra claims `federated_iss` and `email` are carried so audit logs
+    capture which external identity actually acted.
+    """
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(seconds=1800)
+    claims = {
+        "iss": ISSUER,
+        "sub": sub,
+        "email": email,
+        "aud": audiences,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+        "jti": str(uuid.uuid4()),
+        "scope": " ".join(scopes),
+        "federated_iss": federated_issuer,
+    }
+    return jwt.encode(claims, priv_pem, algorithm=ALG, headers={"kid": KID})
 
 
 @oauth_router.post("/introspect", response_model=IntrospectResponse)
