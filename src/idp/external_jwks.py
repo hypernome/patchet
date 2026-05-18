@@ -1,25 +1,14 @@
 """
-Fetch + cache external JWKS, used to verify subject_token JWTs from
-trusted issuers during token exchange.
-
-Cache TTL: 10 min. Keys rotate, so we refresh occasionally.
+JWKS fetch + key resolution via PyJWT's PyJWKClient.
+Handles caching, kid-based key selection, and TLS redirects automatically.
 """
 
-import time
-import httpx
-from typing import Dict, Any
+from jwt import PyJWKClient
 
-_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
-_CACHE_TTL_S = 600
+_clients: dict[str, PyJWKClient] = {}
 
 
-async def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
-    cached = _cache.get(jwks_uri)
-    if cached and cached[0] > time.time():
-        return cached[1]
-    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
-        res = await client.get(jwks_uri)
-        res.raise_for_status()
-        keys = res.json()
-    _cache[jwks_uri] = (time.time() + _CACHE_TTL_S, keys)
-    return keys
+def get_jwks_client(jwks_uri: str) -> PyJWKClient:
+    if jwks_uri not in _clients:
+        _clients[jwks_uri] = PyJWKClient(jwks_uri, cache_keys=True, lifespan=600)
+    return _clients[jwks_uri]

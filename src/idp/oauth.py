@@ -6,12 +6,14 @@ from fastapi import APIRouter, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from jose import jwt
+import jwt as pyjwt
+from jwt.exceptions import InvalidTokenError, PyJWKClientError
 from jose.utils import base64url_encode
 from jose.exceptions import JWTError
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from idp.trusted_issuers import TRUSTED_ISSUERS
-from idp.external_jwks import fetch_jwks
+from idp.external_jwks import get_jwks_client
 
 TOKEN_EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange"
 
@@ -289,8 +291,8 @@ async def token(
 
 
 async def _handle_token_exchange(
-    subject_token: str,
-    subject_token_type: str,
+    subject_token: str | None,
+    subject_token_type: str | None,
     audience: str,
     scope: str,
 ):
@@ -302,37 +304,42 @@ async def _handle_token_exchange(
     ):
         raise HTTPException(400, "unsupported subject_token_type")
 
-    # Decode header to find the issuer (peek at claims without verifying yet)
+    # Peek at the iss claim to look up trust config (signature unverified yet)
     try:
-        unverified = jwt.get_unverified_claims(subject_token)
-    except JWTError:
-        raise HTTPException(400, "malformed subject_token")
+        unverified = pyjwt.decode(subject_token, options={"verify_signature": False})
+    except InvalidTokenError as e:
+        raise HTTPException(400, f"malformed subject_token: {e}")
 
     issuer = unverified.get("iss")
     if not issuer or issuer not in TRUSTED_ISSUERS:
         raise HTTPException(401, f"untrusted issuer: {issuer}")
 
     trusted = TRUSTED_ISSUERS[issuer]
-    # Fetch the issuer's public keys and verify the JWT
-    jwks = await fetch_jwks(trusted.jwks_uri)
+
+    # Fetch issuer JWKS, resolve key by kid
     try:
-        claims = jwt.decode(
+        jwks_client = get_jwks_client(trusted.jwks_uri)
+        signing_key = jwks_client.get_signing_key_from_jwt(subject_token)
+    except PyJWKClientError as e:
+        raise HTTPException(401, f"jwks lookup failed: {e}")
+
+    # Verify signature + claims
+    try:
+        claims = pyjwt.decode(
             subject_token,
-            key=jwks,
-            algorithms=["EdDSA", "RS256", "ES256"],
+            signing_key.key,
+            algorithms=["EdDSA"],
             audience=trusted.expected_audience,
             issuer=trusted.issuer,
         )
-    except JWTError as e:
+    except InvalidTokenError as e:
         raise HTTPException(401, f"subject_token verification failed: {e}")
 
-    # Extract user identity for audit + role mapping
     user_sub = claims.get("sub")
     user_email = claims.get("email")
     if not user_sub:
         raise HTTPException(400, "subject_token missing sub claim")
 
-    # Determine granted scopes + audiences
     requested_scopes = [s for s in scope.split() if s] or trusted.default_scopes
     granted_scopes = [s for s in requested_scopes if s in trusted.default_scopes]
     if not granted_scopes:
@@ -347,7 +354,6 @@ async def _handle_token_exchange(
     if not granted_audiences:
         raise HTTPException(403, "no requested audiences are permitted for this issuer")
 
-    # Mint our own access token bound to the federated user
     access_token = _mint_internal_token(
         sub=f"federated:{issuer}:{user_sub}",
         email=user_email,

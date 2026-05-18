@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 fastapi = "*"
-pyjwt = "*"
+PyJWT = {extras = ["crypto"], version = ">=2.8.0"}
 cryptography = "*"
 httpx = "*"
 uvicorn = "*"
@@ -20,7 +20,7 @@ aiohttp = "*"
 aiodns = "*"
 brotli = "*"
 cvss = "*"
-python-jose = {extras = ["cryptography"], version = "*"}
+python-jose = "*"
 python-multipart = "*"
 langchain-anthropic = "*"
 
