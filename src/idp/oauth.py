@@ -237,8 +237,8 @@ def root_openid_configuration():
 @oauth_router.post("/token", response_model=TokenResponse)
 async def token(
     grant_type: str = Form(...),
-    client_id: str = Form(...),
-    client_secret: str = Form(...),
+    client_id: str = Form(default=None),
+    client_secret: str = Form(default=None),
     subject_token: str = Form(default=None),
     subject_token_type: str = Form(default=None),
     scope: str = Form(default=""),
